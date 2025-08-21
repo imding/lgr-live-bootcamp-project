@@ -1,5 +1,6 @@
 use auth_service::Application;
-use reqwest::{Client, ClientBuilder};
+use reqwest::{header::COOKIE, Client, ClientBuilder, Response};
+use serde_json::json;
 
 pub struct TestApp {
     pub address: String,
@@ -35,5 +36,59 @@ impl TestApp {
             .expect("Failed to execute request.")
     }
 
-    // TODO: Implement helper functions for all other routes (signup, login, logout, verify-2fa, and verify-token)
+    pub async fn post_signup(&self, email: &str, password: &str, requires_2fa: bool) -> Response {
+        self.http_client
+            .post(&format!("{}/signup", &self.address))
+            .json(&json!({
+                "email": email,
+                "password": password,
+                "requires_2fa": requires_2fa
+            }))
+            .send()
+            .await
+            .expect("Failed to execute request.")
+    }
+
+    pub async fn post_login(&self, email: &str, password: &str) -> Response {
+        self.http_client
+            .post(&format!("{}/login", &self.address))
+            .json(&json!({
+                "email": email,
+                "password": password
+            }))
+            .send()
+            .await
+            .expect("Failed to execute request.")
+    }
+
+    pub async fn post_logout(&self, jwt: &str) -> Response {
+        self.http_client
+            .post(&format!("{}/logout", &self.address))
+            .header(COOKIE, json!({ "jwt": jwt }).to_string())
+            .send()
+            .await
+            .expect("Failed to execute request.")
+    }
+
+    pub async fn post_verify_2fa(&self, email: &str, attempt_id: &str, code: &str) -> Response {
+        self.http_client
+            .post(&format!("{}/verify-2fa", &self.address))
+            .json(&json!({
+                "email": email,
+                "loginAttemptId": attempt_id,
+                "2FACode": code
+            }))
+            .send()
+            .await
+            .expect("Failed to execute request.")
+    }
+
+    pub async fn post_verify_token(&self, token: &str) -> Response {
+        self.http_client
+            .post(&format!("{}/verify-token", &self.address))
+            .json(&json!({ "token": token }))
+            .send()
+            .await
+            .expect("Failed to execute request.")
+    }
 }
