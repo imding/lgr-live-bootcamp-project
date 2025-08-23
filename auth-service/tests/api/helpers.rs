@@ -1,8 +1,10 @@
 use {
-    auth_service::Application,
+    auth_service::{Application, app_state::AppState, services::HashmapUserStore},
     reqwest::{Client, ClientBuilder, Response, header::COOKIE},
     serde::Serialize,
     serde_json::json,
+    std::sync::Arc,
+    tokio::sync::RwLock,
     uuid::Uuid,
 };
 
@@ -13,7 +15,9 @@ pub struct TestApp {
 
 impl TestApp {
     pub async fn new() -> Self {
-        let app = Application::build("127.0.0.1:0")
+        let user_store = HashmapUserStore::default();
+        let app_state = AppState::new(Arc::new(RwLock::new(user_store)));
+        let app = Application::build(app_state, "127.0.0.1:0")
             .await
             .expect("Failed to build app");
 
