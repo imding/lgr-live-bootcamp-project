@@ -1,6 +1,10 @@
-use auth_service::Application;
-use reqwest::{header::COOKIE, Client, ClientBuilder, Response};
-use serde_json::json;
+use {
+    auth_service::Application,
+    reqwest::{Client, ClientBuilder, Response, header::COOKIE},
+    serde::Serialize,
+    serde_json::json,
+    uuid::Uuid,
+};
 
 pub struct TestApp {
     pub address: String,
@@ -18,13 +22,14 @@ impl TestApp {
         #[allow(clippy::let_underscore_future)]
         let _ = tokio::spawn(app.run());
 
-        let Ok(http_client) = ClientBuilder::new().build() else {
+        let Ok(http_client) = ClientBuilder::new().build()
+        else {
             panic!("Failed to build reqwest client.")
         };
 
         Self {
             address,
-            http_client
+            http_client,
         }
     }
 
@@ -36,14 +41,13 @@ impl TestApp {
             .expect("Failed to execute request.")
     }
 
-    pub async fn post_signup(&self, email: &str, password: &str, requires_2fa: bool) -> Response {
+    pub async fn post_signup<Body>(&self, body: &Body) -> Response
+    where
+        Body: Serialize,
+    {
         self.http_client
             .post(&format!("{}/signup", &self.address))
-            .json(&json!({
-                "email": email,
-                "password": password,
-                "requires_2fa": requires_2fa
-            }))
+            .json(&json!(body))
             .send()
             .await
             .expect("Failed to execute request.")
@@ -91,4 +95,8 @@ impl TestApp {
             .await
             .expect("Failed to execute request.")
     }
+}
+
+pub fn get_random_email() -> String {
+    format!("{}@example.com", Uuid::new_v4())
 }
