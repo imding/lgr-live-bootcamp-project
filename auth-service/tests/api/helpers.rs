@@ -4,7 +4,6 @@ use {
     serde::Serialize,
     serde_json::json,
     std::sync::Arc,
-    tokio::sync::RwLock,
     uuid::Uuid,
 };
 
@@ -16,7 +15,7 @@ pub struct TestApp {
 impl TestApp {
     pub async fn new() -> Self {
         let user_store = HashmapUserStore::default();
-        let app_state = AppState::new(Arc::new(RwLock::new(user_store)));
+        let app_state = AppState::new(Arc::new(user_store));
         let app = Application::build(app_state, "127.0.0.1:0")
             .await
             .expect("Failed to build app");
@@ -39,7 +38,7 @@ impl TestApp {
 
     pub async fn get_root(&self) -> reqwest::Response {
         self.http_client
-            .get(&format!("{}/", &self.address))
+            .get(format!("{}/", &self.address))
             .send()
             .await
             .expect("Failed to execute request.")
@@ -50,7 +49,7 @@ impl TestApp {
         Body: Serialize,
     {
         self.http_client
-            .post(&format!("{}/signup", &self.address))
+            .post(format!("{}/signup", &self.address))
             .json(&json!(body))
             .send()
             .await
@@ -59,7 +58,7 @@ impl TestApp {
 
     pub async fn post_login(&self, email: &str, password: &str) -> Response {
         self.http_client
-            .post(&format!("{}/login", &self.address))
+            .post(format!("{}/login", &self.address))
             .json(&json!({
                 "email": email,
                 "password": password
@@ -71,7 +70,7 @@ impl TestApp {
 
     pub async fn post_logout(&self, jwt: &str) -> Response {
         self.http_client
-            .post(&format!("{}/logout", &self.address))
+            .post(format!("{}/logout", &self.address))
             .header(COOKIE, json!({ "jwt": jwt }).to_string())
             .send()
             .await
@@ -80,7 +79,7 @@ impl TestApp {
 
     pub async fn post_verify_2fa(&self, email: &str, attempt_id: &str, code: &str) -> Response {
         self.http_client
-            .post(&format!("{}/verify-2fa", &self.address))
+            .post(format!("{}/verify-2fa", &self.address))
             .json(&json!({
                 "email": email,
                 "loginAttemptId": attempt_id,
@@ -93,7 +92,7 @@ impl TestApp {
 
     pub async fn post_verify_token(&self, token: &str) -> Response {
         self.http_client
-            .post(&format!("{}/verify-token", &self.address))
+            .post(format!("{}/verify-token", &self.address))
             .json(&json!({ "token": token }))
             .send()
             .await

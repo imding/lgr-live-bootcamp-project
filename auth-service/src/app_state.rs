@@ -1,6 +1,6 @@
-use {crate::services::HashmapUserStore, std::sync::Arc, tokio::sync::RwLock};
+use {crate::domain::data_stores::UserStore, std::sync::Arc};
 
-pub type UserStoreType = Arc<RwLock<HashmapUserStore>>;
+pub type UserStoreType = Arc<dyn UserStore>;
 
 #[derive(Clone)]
 pub struct AppState {

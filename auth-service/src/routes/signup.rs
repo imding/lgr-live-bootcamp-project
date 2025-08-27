@@ -1,5 +1,8 @@
 use {
-    crate::{app_state::AppState, domain::{error::AuthAPIError, user::User}},
+    crate::{
+        app_state::AppState,
+        domain::{error::AuthAPIError, user::User},
+    },
     axum::{extract::State, http::StatusCode, response::IntoResponse, Json},
     serde::{Deserialize, Serialize},
 };
@@ -29,19 +32,13 @@ pub async fn signup(
         return Err(AuthAPIError::InvalidCredentials);
     }
 
-    let mut user_store = state.user_store.write().await;
-
-    if user_store.get_user(email).is_ok() {
+    if state.user_store.get_user(email).await.is_ok() {
         return Err(AuthAPIError::UserAlreadyExists);
     }
 
-    let user = User::new(
-        &email,
-        &password,
-        request.requires_2fa,
-    );
+    let user = User::new(email, password, request.requires_2fa);
 
-    if user_store.add_user(user).is_err() {
+    if state.user_store.add_user(user).await.is_err() {
         return Err(AuthAPIError::UnexpectedError);
     }
 

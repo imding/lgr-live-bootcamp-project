@@ -54,7 +54,7 @@ async fn should_return_400_if_invalid_input() {
     for test_case in test_cases.iter() {
         let response = app.post_signup(test_case).await;
 
-        assert_eq!(response.status().as_u16(), 400, "Failed for input: {:?}", test_case);
+        assert_eq!(response.status().as_u16(), 400, "Failed for input: {test_case:?}");
 
         assert_eq!(
             response
