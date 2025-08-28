@@ -1,7 +1,6 @@
 use {
     crate::domain::{
-        data_stores::{UserStore, UserStoreError},
-        user::User,
+        data_stores::{UserStore, UserStoreError}, email::Email, password::Password, user::User
     },
     std::{
         collections::HashMap,
@@ -11,7 +10,7 @@ use {
 
 #[derive(Default)]
 pub struct HashmapUserStore {
-    users: Arc<Mutex<HashMap<String, User>>>,
+    users: Arc<Mutex<HashMap<Email, User>>>,
 }
 
 #[async_trait::async_trait]
@@ -30,7 +29,7 @@ impl UserStore for HashmapUserStore {
         Ok(())
     }
 
-    async fn get_user(&self, email: &str) -> Result<User, UserStoreError> {
+    async fn get_user(&self, email: &Email) -> Result<User, UserStoreError> {
         let Ok(users) = self.users.lock() else {
             return Err(UserStoreError::UnexpectedError);
         };
@@ -42,10 +41,10 @@ impl UserStore for HashmapUserStore {
         Ok(maybe_user.clone())
     }
 
-    async fn validate_user(&self, email: &str, password: &str) -> Result<(), UserStoreError> {
+    async fn validate_user(&self, email: &Email, password: &Password) -> Result<(), UserStoreError> {
         let user = self.get_user(email).await?;
 
-        if user.password != password {
+        if user.password != *password {
             return Err(UserStoreError::InvalidCredentials);
         }
 
@@ -60,7 +59,11 @@ mod tests {
     #[tokio::test]
     async fn test_add_user() {
         let store = HashmapUserStore::default();
-        let user = User::new("me@null.computer", "abc123", true);
+        let user = User::new(
+            &Email::parse("me@null.computer").unwrap(),
+            &Password::parse("abcd1234").unwrap(),
+            true
+        );
 
         assert_eq!(store.add_user(user.clone()).await, Ok(()));
         assert_eq!(
@@ -72,12 +75,17 @@ mod tests {
     #[tokio::test]
     async fn test_get_user() {
         let store = HashmapUserStore::default();
-        let user = User::new("me@null.computer", "abc123", true);
+        let email = Email::parse("me@null.computer").unwrap();
+        let user = User::new(
+            &email,
+            &Password::parse("abcd1234").unwrap(),
+            true
+        );
 
         assert_eq!(store.add_user(user.clone()).await, Ok(()));
-        assert_eq!(store.get_user("me@null.computer").await, Ok(user));
+        assert_eq!(store.get_user(&email).await, Ok(user));
         assert_eq!(
-            store.get_user("you@null.computer").await,
+            store.get_user(&Email::parse("you@null.computer").unwrap()).await,
             Err(UserStoreError::UserNotFound)
         );
     }
@@ -85,18 +93,18 @@ mod tests {
     #[tokio::test]
     async fn test_validate_user() {
         let store = HashmapUserStore::default();
-        let email = "me@null.computer";
-        let password = "abc123";
-        let user = User::new(email, password, true);
+        let email = Email::parse("me@null.computer").unwrap();
+        let password = Password::parse("abcd1234").unwrap();
+        let user = User::new(&email, &password, true);
 
         assert_eq!(
-            store.validate_user(email, password).await,
+            store.validate_user(&email, &password).await,
             Err(UserStoreError::UserNotFound)
         );
         assert_eq!(store.add_user(user.clone()).await, Ok(()));
-        assert_eq!(store.validate_user(email, password).await, Ok(()));
+        assert_eq!(store.validate_user(&email, &password).await, Ok(()));
         assert_eq!(
-            store.validate_user(email, "xyz123").await,
+            store.validate_user(&email, &Password::parse("wxyz7890").unwrap()).await,
             Err(UserStoreError::InvalidCredentials)
         );
     }
