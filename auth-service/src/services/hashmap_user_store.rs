@@ -2,23 +2,19 @@ use {
     crate::domain::{
         data_stores::{UserStore, UserStoreError}, email::Email, password::Password, user::User
     },
-    std::{
-        collections::HashMap,
-        sync::{Arc, Mutex},
-    },
+    std::collections::HashMap,
+    tokio::sync::RwLock,
 };
 
 #[derive(Default)]
 pub struct HashmapUserStore {
-    users: Arc<Mutex<HashMap<Email, User>>>,
+    users: RwLock<HashMap<Email, User>>,
 }
 
 #[async_trait::async_trait]
 impl UserStore for HashmapUserStore {
     async fn add_user(&self, user: User) -> Result<(), UserStoreError> {
-        let Ok(mut users) = self.users.lock() else {
-            return Err(UserStoreError::UnexpectedError);
-        };
+        let mut users = self.users.write().await;
 
         if users.contains_key(&user.email) {
             return Err(UserStoreError::UserAlreadyExists);
@@ -30,10 +26,7 @@ impl UserStore for HashmapUserStore {
     }
 
     async fn get_user(&self, email: &Email) -> Result<User, UserStoreError> {
-        let Ok(users) = self.users.lock() else {
-            return Err(UserStoreError::UnexpectedError);
-        };
-
+        let users = self.users.read().await;
         let Some(maybe_user) = users.get(email) else {
             return Err(UserStoreError::UserNotFound);
         };
