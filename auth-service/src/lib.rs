@@ -6,13 +6,12 @@ pub mod services;
 use {
     crate::{
         domain::error::AuthAPIError,
-        routes::{login, logout, signup, verify_2fa, verify_token}
+        routes::{login, logout, signup, verify_2fa, verify_token},
     },
     app_state::AppState,
     axum::{
+        Json, Router,
         http::StatusCode,
-        Json,
-        Router,
         response::{IntoResponse, Response},
         routing::post,
         serve::Serve,
@@ -27,7 +26,7 @@ pub struct Application {
     pub address: String,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct ErrorResponse {
     pub error: String,
 }
@@ -61,11 +60,10 @@ impl IntoResponse for AuthAPIError {
         let (status, error_message) = match self {
             AuthAPIError::UserAlreadyExists => (StatusCode::CONFLICT, "User already exists"),
             AuthAPIError::InvalidCredentials => (StatusCode::BAD_REQUEST, "Invalid credentials"),
-            AuthAPIError::UnexpectedError => (StatusCode::INTERNAL_SERVER_ERROR, "Unexpected error")
+            AuthAPIError::IncorrectCredentials => (StatusCode::UNAUTHORIZED, "Incorrect credentials"),
+            AuthAPIError::UnexpectedError => (StatusCode::INTERNAL_SERVER_ERROR, "Unexpected error"),
         };
-        let body = Json(ErrorResponse {
-            error: error_message.to_string()
-        });
+        let body = Json(ErrorResponse { error: error_message.to_string() });
 
         (status, body).into_response()
     }

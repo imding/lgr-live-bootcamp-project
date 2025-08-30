@@ -3,7 +3,7 @@ use {
         app_state::AppState,
         domain::{email::Email, error::AuthAPIError, password::Password, user::User},
     },
-    axum::{extract::State, http::StatusCode, response::IntoResponse, Json},
+    axum::{Json, extract::State, http::StatusCode, response::IntoResponse},
     serde::{Deserialize, Serialize},
 };
 
@@ -25,10 +25,12 @@ pub async fn signup(
     Json(request): Json<SignupRequest>,
 ) -> Result<impl IntoResponse, AuthAPIError> {
     println!("/signup");
-    let Ok(email) = Email::parse(&request.email) else {
+    let Ok(email) = Email::parse(&request.email)
+    else {
         return Err(AuthAPIError::InvalidCredentials);
     };
-    let Ok(password) = Password::parse(&request.password) else {
+    let Ok(password) = Password::parse(&request.password)
+    else {
         return Err(AuthAPIError::InvalidCredentials);
     };
 
@@ -42,10 +44,5 @@ pub async fn signup(
         return Err(AuthAPIError::UnexpectedError);
     }
 
-    Ok((
-        StatusCode::CREATED,
-        Json(SignupResponse {
-            message: "User created successfully!".to_string(),
-        }),
-    ))
+    Ok((StatusCode::CREATED, Json(SignupResponse { message: "User created successfully!".to_string() })))
 }
