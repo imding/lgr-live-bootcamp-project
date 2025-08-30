@@ -1,0 +1,7 @@
+binop_separator = "Back"
+brace_style = "SameLineWhere"
+control_brace_style = "ClosingNextLine"
+imports_granularity = "One"
+max_width = 120
+single_line_let_else_max_width = 0
+use_small_heuristics = "Max"
