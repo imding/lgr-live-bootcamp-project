@@ -2,6 +2,7 @@ pub mod app_state;
 mod domain;
 pub mod routes;
 pub mod services;
+pub mod utils;
 
 use {
     crate::{
@@ -14,16 +15,17 @@ use {
         http::StatusCode,
         response::{IntoResponse, Response},
         routing::post,
-        serve::Serve,
     },
     serde::{Deserialize, Serialize},
-    std::error::Error,
+    std::{error::Error, io::Error as IoError},
+    tokio::net::TcpListener,
     tower_http::services::ServeDir,
 };
 
 pub struct Application {
-    server: Serve<Router, Router>,
     pub address: String,
+    listener: TcpListener,
+    router: Router,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -34,7 +36,7 @@ pub struct ErrorResponse {
 impl Application {
     pub async fn build(app_state: AppState, address: &str) -> Result<Self, Box<dyn Error>> {
         let router = Router::new()
-            .nest_service("/", ServeDir::new("assets"))
+            .fallback_service(ServeDir::new("assets"))
             .route("/signup", post(signup))
             .route("/login", post(login))
             .route("/logout", post(logout))
@@ -44,14 +46,13 @@ impl Application {
 
         let listener = tokio::net::TcpListener::bind(address).await?;
         let address = listener.local_addr()?.to_string();
-        let server = axum::serve(listener, router);
 
-        Ok(Self { server, address })
+        Ok(Self { address, listener, router })
     }
 
-    pub async fn run(self) -> Result<(), std::io::Error> {
-        println!("listening on {}", &self.address);
-        self.server.await
+    pub async fn run(self) -> Result<(), IoError> {
+        axum::serve(self.listener, self.router).await?;
+        Ok(println!("listening on {}", &self.address))
     }
 }
 

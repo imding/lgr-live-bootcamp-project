@@ -1,8 +1,37 @@
 use {
     crate::helpers::{TestApp, get_random_email},
-    auth_service::{ErrorResponse, routes::LoginResponse},
+    auth_service::{ErrorResponse, routes::LoginResponse, utils::constants::JWT_COOKIE_NAME},
     serde_json::json,
 };
+
+#[tokio::test]
+async fn should_return_200_if_valid_credentials_and_2fa_disabled() {
+    let app = TestApp::new().await;
+    let email = get_random_email();
+    let password = "abcd1234";
+    let response = app
+        .post_signup(&json!({
+            "email": email,
+            "password": password,
+            "requires2FA": false
+        }))
+        .await;
+
+    assert_eq!(response.status().as_u16(), 201);
+
+    let response = app
+        .post_login(&json!({
+            "email": email,
+            "password": password,
+        }))
+        .await;
+
+    assert_eq!(response.status().as_u16(), 200);
+
+    let cookie = response.cookies().find(|cookie| cookie.name() == JWT_COOKIE_NAME).expect("No auth cookie found");
+
+    assert!(!cookie.value().is_empty());
+}
 
 #[tokio::test]
 async fn should_return_400_if_invalid_input() {
