@@ -1,6 +1,8 @@
 pub enum AuthAPIError {
-    UserAlreadyExists,
-    InvalidCredentials,
     IncorrectCredentials,
+    InvalidCredentials,
+    InvalidToken,
+    MissingToken,
+    UserAlreadyExists,
     UnexpectedError,
 }

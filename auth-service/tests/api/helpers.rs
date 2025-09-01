@@ -1,6 +1,10 @@
 use {
-    auth_service::{Application, app_state::AppState, services::HashmapUserStore},
-    reqwest::{Client, ClientBuilder, Response, header::COOKIE},
+    auth_service::{Application, app_state::AppState, services::HashmapUserStore, utils::constants::test},
+    reqwest::{
+        Client, ClientBuilder, Response, Url,
+        cookie::{CookieStore, Jar},
+        header::COOKIE,
+    },
     serde::Serialize,
     serde_json::json,
     std::sync::Arc,
@@ -9,6 +13,7 @@ use {
 
 pub struct TestApp {
     pub address: String,
+    pub cookie_jar: Arc<Jar>,
     pub http_client: Client,
 }
 
@@ -16,19 +21,18 @@ impl TestApp {
     pub async fn new() -> Self {
         let user_store = HashmapUserStore::default();
         let app_state = AppState::new(Arc::new(user_store));
-        let app = Application::build(app_state, "127.0.0.1:0").await.expect("Failed to build app");
-
+        let app = Application::build(app_state, test::APP_ADDRESS).await.expect("Failed to build app");
         let address = format!("http://{}", app.address.clone());
 
         #[allow(clippy::let_underscore_future)]
         let _ = tokio::spawn(app.run());
-
-        let Ok(http_client) = ClientBuilder::new().build()
+        let cookie_jar = Arc::new(Jar::default());
+        let Ok(http_client) = ClientBuilder::new().cookie_provider(Arc::clone(&cookie_jar)).build()
         else {
             panic!("Failed to build reqwest client.")
         };
 
-        Self { address, http_client }
+        Self { address, cookie_jar, http_client }
     }
 
     pub async fn get_root(&self) -> reqwest::Response {
@@ -59,10 +63,21 @@ impl TestApp {
             .expect("Failed to execute request.")
     }
 
-    pub async fn post_logout(&self, jwt: &str) -> Response {
+    pub async fn post_logout(&self) -> Response {
+        let cookies = match Url::parse(&self.address) {
+            Ok(url) => match self.cookie_jar.cookies(&url) {
+                Some(cookies) => match cookies.to_str() {
+                    Ok(cookies) => cookies.to_string(),
+                    _ => String::new(),
+                },
+                _ => String::new(),
+            },
+            _ => String::new(),
+        };
+
         self.http_client
             .post(format!("{}/logout", &self.address))
-            .header(COOKIE, json!({ "jwt": jwt }).to_string())
+            .header(COOKIE, cookies)
             .send()
             .await
             .expect("Failed to execute request.")
