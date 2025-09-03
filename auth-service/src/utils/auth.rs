@@ -40,7 +40,7 @@ fn create_auth_cookie(token: String) -> Cookie<'static> {
     cookie
 }
 
-fn generate_auth_token(email: &Email) -> Result<String, GenerateTokenError> {
+pub fn generate_auth_token(email: &Email) -> Result<String, GenerateTokenError> {
     let delta = Duration::try_seconds(TOKEN_TTL_SECONDS).ok_or(GenerateTokenError::UnexpectedError)?;
     let exp: usize = Utc::now()
         .checked_add_signed(delta)
@@ -66,6 +66,7 @@ mod tests {
     async fn test_generate_auth_cookie() {
         let email = Email::parse("test@example.com").unwrap();
         let cookie = generate_auth_cookie(&email).unwrap();
+
         assert_eq!(cookie.name(), JWT_COOKIE_NAME);
         assert_eq!(cookie.value().split('.').count(), 3);
         assert_eq!(cookie.path(), Some("/"));
@@ -77,6 +78,7 @@ mod tests {
     async fn test_create_auth_cookie() {
         let token = "test_token".to_owned();
         let cookie = create_auth_cookie(token.clone());
+
         assert_eq!(cookie.name(), JWT_COOKIE_NAME);
         assert_eq!(cookie.value(), token);
         assert_eq!(cookie.path(), Some("/"));
@@ -88,6 +90,7 @@ mod tests {
     async fn test_generate_auth_token() {
         let email = Email::parse("test@example.com").unwrap();
         let result = generate_auth_token(&email).unwrap();
+
         assert_eq!(result.split('.').count(), 3);
     }
 
@@ -96,6 +99,7 @@ mod tests {
         let email = Email::parse("test@example.com").unwrap();
         let token = generate_auth_token(&email).unwrap();
         let result = validate_token(&token).await.unwrap();
+
         assert_eq!(result.sub, "test@example.com");
 
         let exp = Utc::now()
@@ -110,6 +114,7 @@ mod tests {
     async fn test_validate_token_with_invalid_token() {
         let token = "invalid_token".to_owned();
         let result = validate_token(&token).await;
+
         assert!(result.is_err());
     }
 }

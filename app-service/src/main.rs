@@ -1,15 +1,16 @@
-use std::env;
-
-use askama::Template;
-use axum::{
-    http::StatusCode,
-    response::{Html, IntoResponse},
-    routing::get,
-    Json, Router,
+use {
+    askama::Template,
+    axum::{
+        http::StatusCode,
+        response::{Html, IntoResponse},
+        routing::get,
+        Json, Router,
+    },
+    axum_extra::extract::CookieJar,
+    serde::Serialize,
+    std::env,
+    tower_http::services::ServeDir,
 };
-use axum_extra::extract::CookieJar;
-use serde::Serialize;
-use tower_http::services::ServeDir;
 
 #[tokio::main]
 async fn main() {
@@ -36,13 +37,10 @@ async fn root() -> impl IntoResponse {
     if address.is_empty() {
         address = "localhost".to_owned();
     }
-    let login_link = format!("http://{}:3000", address);
-    let logout_link = format!("http://{}:3000/logout", address);
+    let login_link = format!("http://{address}:3000");
+    let logout_link = format!("http://{address}:3000/logout");
 
-    let template = IndexTemplate {
-        login_link,
-        logout_link,
-    };
+    let template = IndexTemplate { login_link, logout_link };
     Html(template.render().unwrap())
 }
 
@@ -61,7 +59,7 @@ async fn protected(jar: CookieJar) -> impl IntoResponse {
     });
 
     let auth_hostname = env::var("AUTH_SERVICE_HOST_NAME").unwrap_or("0.0.0.0".to_owned());
-    let url = format!("http://{}:3000/verify-token", auth_hostname);
+    let url = format!("http://{auth_hostname}:3000/verify-token");
 
     let response = match api_client.post(&url).json(&verify_token_body).send().await {
         Ok(response) => response,
