@@ -1,6 +1,6 @@
 use {
-    crate::{domain::error::AuthAPIError, utils::auth::validate_token},
-    axum::{Json, http::StatusCode, response::IntoResponse},
+    crate::{app_state::AppState, domain::error::AuthAPIError, utils::auth::validate_token},
+    axum::{Json, extract::State, http::StatusCode, response::IntoResponse},
     serde::{Deserialize, Serialize},
 };
 
@@ -14,7 +14,10 @@ struct VerifyTokenResponse {
     message: String,
 }
 
-pub async fn verify_token(Json(request): Json<VerifyTokenRequest>) -> Result<impl IntoResponse, AuthAPIError> {
+pub async fn verify_token(
+    state: State<AppState>,
+    Json(request): Json<VerifyTokenRequest>,
+) -> Result<impl IntoResponse, AuthAPIError> {
     println!("/verify-token");
 
     let parts = request.token.split('.').collect::<Vec<_>>();
@@ -23,7 +26,7 @@ pub async fn verify_token(Json(request): Json<VerifyTokenRequest>) -> Result<imp
         return Err(AuthAPIError::MalformedToken);
     }
 
-    if validate_token(&request.token).await.is_err() {
+    if validate_token(Some(state.banned_token_store.clone()), &request.token).await.is_err() {
         return Err(AuthAPIError::InvalidToken);
     }
 

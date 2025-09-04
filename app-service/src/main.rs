@@ -1,10 +1,10 @@
 use {
     askama::Template,
     axum::{
+        Json, Router,
         http::StatusCode,
         response::{Html, IntoResponse},
         routing::get,
-        Json, Router,
     },
     axum_extra::extract::CookieJar,
     serde::Serialize,
@@ -22,6 +22,7 @@ async fn main() {
     let listener = tokio::net::TcpListener::bind("0.0.0.0:8000").await.unwrap();
 
     println!("listening on {}", listener.local_addr().unwrap());
+
     axum::serve(listener, app).await.unwrap();
 }
 
@@ -34,20 +35,22 @@ struct IndexTemplate {
 
 async fn root() -> impl IntoResponse {
     let mut address = env::var("AUTH_SERVICE_IP").unwrap_or("localhost".to_owned());
+
     if address.is_empty() {
         address = "localhost".to_owned();
     }
+
     let login_link = format!("http://{address}:3000");
     let logout_link = format!("http://{address}:3000/logout");
-
     let template = IndexTemplate { login_link, logout_link };
+
     Html(template.render().unwrap())
 }
 
 async fn protected(jar: CookieJar) -> impl IntoResponse {
     let jwt_cookie = match jar.get("jwt") {
         Some(cookie) => cookie,
-        None => {
+        _ => {
             return StatusCode::UNAUTHORIZED.into_response();
         }
     };

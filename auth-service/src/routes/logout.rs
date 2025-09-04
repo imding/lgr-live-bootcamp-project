@@ -1,13 +1,14 @@
 use {
     crate::{
+        app_state::AppState,
         domain::error::AuthAPIError,
         utils::{auth::validate_token, constants::JWT_COOKIE_NAME},
     },
-    axum::{http::StatusCode, response::IntoResponse},
+    axum::{extract::State, http::StatusCode, response::IntoResponse},
     axum_extra::extract::{CookieJar, cookie::Cookie},
 };
 
-pub async fn logout(jar: CookieJar) -> Result<(CookieJar, impl IntoResponse), AuthAPIError> {
+pub async fn logout(state: State<AppState>, jar: CookieJar) -> Result<(CookieJar, impl IntoResponse), AuthAPIError> {
     println!("/logout");
     let Some(cookie) = jar.get(JWT_COOKIE_NAME)
     else {
@@ -19,9 +20,11 @@ pub async fn logout(jar: CookieJar) -> Result<(CookieJar, impl IntoResponse), Au
         return Err(AuthAPIError::MissingToken);
     }
 
-    if validate_token(&token).await.is_err() {
+    if validate_token(Some(state.banned_token_store.clone()), &token).await.is_err() {
         return Err(AuthAPIError::InvalidToken);
     }
+
+    state.banned_token_store.register(vec![&token]).await;
 
     Ok((jar.remove(Cookie::from((JWT_COOKIE_NAME, token))), StatusCode::OK))
 }

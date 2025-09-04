@@ -16,9 +16,23 @@ async fn should_return_200_if_malformed_input() {
 }
 
 #[tokio::test]
+async fn should_return_401_if_banned_token() {
+    let app = TestApp::new().await;
+    let email = get_random_email();
+    let email = Email::parse(&email).unwrap();
+    let token = generate_auth_token(&email).unwrap();
+
+    app.banned_token_store.register(vec![&token]).await;
+
+    let response = app.post_verify_token(&json!({ "token": token })).await;
+
+    assert_eq!(response.status().as_u16(), 401);
+}
+
+#[tokio::test]
 async fn should_return_401_if_invalid_input() {
     let app = TestApp::new().await;
-    let response = app.post_verify_token(&json!({ "token": "abcd.efgh.lmnk" })).await;
+    let response = app.post_verify_token(&json!({ "token": "abcd.efgh.ijkl" })).await;
 
     assert_eq!(response.status().as_u16(), 401);
 }

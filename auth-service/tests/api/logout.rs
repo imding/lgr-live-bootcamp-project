@@ -18,15 +18,18 @@ async fn should_return_200_if_valid_jwt_cookie() {
     }))
     .await;
 
-    app.post_login(&json!({
-        "email": email,
-        "password": password,
-    }))
-    .await;
+    let response = app
+        .post_login(&json!({
+            "email": email,
+            "password": password,
+        }))
+        .await;
+    let token = response.cookies().find(|cookie| cookie.name() == JWT_COOKIE_NAME).expect("No auth cookie found");
 
     let response = app.post_logout().await;
 
     assert_eq!(response.status().as_u16(), 200);
+    assert!(app.banned_token_store.check(token.value()).await);
 }
 
 #[tokio::test]

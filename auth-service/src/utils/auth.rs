@@ -1,5 +1,6 @@
 use {
     crate::{
+        app_state::BannedTokenStoreType,
         domain::email::Email,
         utils::constants::{JWT_COOKIE_NAME, JWT_SECRET},
     },
@@ -17,6 +18,12 @@ pub enum GenerateTokenError {
     UnexpectedError,
 }
 
+#[derive(Debug)]
+pub enum ValidateTokenError {
+    TokenError(JwtError),
+    BannedToken,
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Claims {
     pub exp: usize,
@@ -29,9 +36,19 @@ pub fn generate_auth_cookie(email: &Email) -> Result<Cookie<'static>, GenerateTo
     Ok(create_auth_cookie(token))
 }
 
-pub async fn validate_token(token: &str) -> Result<Claims, JwtError> {
-    decode::<Claims>(token, &DecodingKey::from_secret(JWT_SECRET.as_bytes()), &Validation::default())
+pub async fn validate_token(store: Option<BannedTokenStoreType>, token: &str) -> Result<Claims, ValidateTokenError> {
+    if let Some(store) = store {
+        if store.check(token).await {
+            return Err(ValidateTokenError::BannedToken);
+        }
+    }
+
+    match decode::<Claims>(token, &DecodingKey::from_secret(JWT_SECRET.as_bytes()), &Validation::default())
         .map(|data| data.claims)
+    {
+        Ok(claims) => Ok(claims),
+        Err(error) => Err(ValidateTokenError::TokenError(error)),
+    }
 }
 
 fn create_auth_cookie(token: String) -> Cookie<'static> {
@@ -98,7 +115,7 @@ mod tests {
     async fn test_validate_token_with_valid_token() {
         let email = Email::parse("test@example.com").unwrap();
         let token = generate_auth_token(&email).unwrap();
-        let result = validate_token(&token).await.unwrap();
+        let result = validate_token(None, &token).await.unwrap();
 
         assert_eq!(result.sub, "test@example.com");
 
@@ -113,7 +130,7 @@ mod tests {
     #[tokio::test]
     async fn test_validate_token_with_invalid_token() {
         let token = "invalid_token".to_owned();
-        let result = validate_token(&token).await;
+        let result = validate_token(None, &token).await;
 
         assert!(result.is_err());
     }
