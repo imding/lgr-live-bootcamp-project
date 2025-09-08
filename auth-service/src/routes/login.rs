@@ -1,7 +1,12 @@
 use {
     crate::{
         app_state::AppState,
-        domain::{email::Email, error::AuthAPIError, password::Password},
+        domain::{
+            data_stores::{LoginAttemptId, TwoFactorCode},
+            email::Email,
+            error::AuthAPIError,
+            password::Password,
+        },
         utils::auth::generate_auth_cookie,
     },
     axum::{
@@ -20,9 +25,23 @@ pub struct LoginRequest {
     pub password: String,
 }
 
-#[derive(Debug, Deserialize, PartialEq, Serialize)]
-pub struct LoginResponse {
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum LoginResponse {
+    RegularAuth(RegularAuthResponse),
+    TwoFactorAuth(TwoFactorAuthResponse),
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct RegularAuthResponse {
     pub message: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct TwoFactorAuthResponse {
+    pub message: String,
+    #[serde(rename = "loginAttemptId")]
+    pub login_attempt_id: LoginAttemptId,
 }
 
 pub async fn login(
@@ -38,7 +57,7 @@ pub async fn login(
 
             eprintln!("{message}");
 
-            return Ok((jar, (rejection.status(), Json(LoginResponse { message }))));
+            return Ok((jar, (rejection.status(), Json(LoginResponse::RegularAuth(RegularAuthResponse { message })))));
         }
     };
     let Ok(email) = Email::parse(&request.email)
@@ -54,11 +73,45 @@ pub async fn login(
         return Err(AuthAPIError::IncorrectCredentials);
     }
 
+    let Ok((status, response)) = (match user.requires_2fa {
+        true => handle_2fa(&email, &state).await,
+        false => handle_no_2fa().await,
+    })
+    else {
+        return Err(AuthAPIError::UnexpectedError);
+    };
+
     let Ok(auth_cookie) = generate_auth_cookie(&email)
     else {
         return Err(AuthAPIError::UnexpectedError);
     };
     let updated_jar = jar.add(auth_cookie);
 
-    Ok((updated_jar, (StatusCode::OK, Json(LoginResponse { message: "User logged in successfully!".to_string() }))))
+    println!("{response:?}");
+
+    Ok((updated_jar, (status, Json(response))))
+}
+
+async fn handle_2fa(email: &Email, state: &AppState) -> Result<(StatusCode, LoginResponse), AuthAPIError> {
+    let attempt_id = LoginAttemptId::default();
+    let code = TwoFactorCode::default();
+
+    if state.two_factor_store.add_code(email.clone(), attempt_id.clone(), code).await.is_err() {
+        return Err(AuthAPIError::UnexpectedError);
+    }
+
+    Ok((
+        StatusCode::PARTIAL_CONTENT,
+        LoginResponse::TwoFactorAuth(TwoFactorAuthResponse {
+            message: "2FA required".to_string(),
+            login_attempt_id: attempt_id,
+        }),
+    ))
+}
+
+async fn handle_no_2fa() -> Result<(StatusCode, LoginResponse), AuthAPIError> {
+    return Ok((
+        StatusCode::OK,
+        LoginResponse::RegularAuth(RegularAuthResponse { message: "User logged in successfully!".to_string() }),
+    ));
 }

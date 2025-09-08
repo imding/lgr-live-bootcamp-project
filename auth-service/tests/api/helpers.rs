@@ -1,8 +1,8 @@
 use {
     auth_service::{
         Application,
-        app_state::{AppState, BannedTokenStoreType},
-        services::{HashmapUserStore, HashsetBannedTokenStore},
+        app_state::{AppState, BannedTokenStoreType, TwoFactorStoreType},
+        services::{HashmapTwoFactorStore, HashmapUserStore, HashsetBannedTokenStore},
         utils::constants::test,
     },
     reqwest::{
@@ -19,6 +19,7 @@ use {
 pub struct TestApp {
     pub address: String,
     pub banned_token_store: BannedTokenStoreType,
+    pub two_factor_store: TwoFactorStoreType,
     pub cookie_jar: Arc<Jar>,
     pub http_client: Client,
 }
@@ -27,7 +28,8 @@ impl TestApp {
     pub async fn new() -> Self {
         let user_store = Arc::new(HashmapUserStore::default());
         let banned_token_store = Arc::new(HashsetBannedTokenStore::default());
-        let app_state = AppState::new(banned_token_store.clone(), user_store);
+        let two_factor_store = Arc::new(HashmapTwoFactorStore::default());
+        let app_state = AppState::new(banned_token_store.clone(), user_store, two_factor_store.clone());
         let app = Application::build(app_state, test::APP_ADDRESS).await.expect("Failed to build app");
         let address = format!("http://{}", app.address.clone());
 
@@ -39,7 +41,7 @@ impl TestApp {
             panic!("Failed to build reqwest client.")
         };
 
-        Self { address, cookie_jar, banned_token_store, http_client }
+        Self { address, cookie_jar, banned_token_store, two_factor_store, http_client }
     }
 
     pub async fn get_root(&self) -> reqwest::Response {

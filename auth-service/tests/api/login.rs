@@ -1,6 +1,11 @@
 use {
     crate::helpers::{TestApp, get_random_email},
-    auth_service::{ErrorResponse, routes::LoginResponse, utils::constants::JWT_COOKIE_NAME},
+    auth_service::{
+        ErrorResponse,
+        domain::email::Email,
+        routes::{RegularAuthResponse, TwoFactorAuthResponse},
+        utils::constants::JWT_COOKIE_NAME,
+    },
     serde_json::json,
 };
 
@@ -34,6 +39,47 @@ async fn should_return_200_if_valid_credentials_and_2fa_disabled() {
 }
 
 #[tokio::test]
+async fn should_return_206_if_valid_credentials_and_2fa_enabled() {
+    let app = TestApp::new().await;
+    let email = get_random_email();
+    let password = "abcd1234";
+    let response = app
+        .post_signup(&json!({
+            "email": email,
+            "password": password,
+            "requires2FA": true
+        }))
+        .await;
+
+    assert_eq!(response.status().as_u16(), 201);
+
+    let response = app
+        .post_login(&json!({
+            "email": email,
+            "password": password,
+        }))
+        .await;
+
+    assert_eq!(response.status().as_u16(), 206);
+
+    let body = response
+        .json::<TwoFactorAuthResponse>()
+        .await
+        .expect("Could not deserialize response body to TwoFactorAuthResponse");
+
+    assert_eq!(body.message, "2FA required".to_owned());
+
+    let email = Email::parse(&email).unwrap();
+    let maybe_value = app.two_factor_store.get_code(&email).await;
+
+    assert!(maybe_value.is_ok());
+
+    let (attempt_id, _) = maybe_value.unwrap();
+
+    assert_eq!(body.login_attempt_id, attempt_id);
+}
+
+#[tokio::test]
 async fn should_return_400_if_invalid_input() {
     let app = TestApp::new().await;
     let email = get_random_email();
@@ -41,7 +87,7 @@ async fn should_return_400_if_invalid_input() {
         .post_signup(&json!({
             "email": email,
             "password": "abcd1234",
-            "requires2FA": true
+            "requires2FA": false
         }))
         .await;
     let response = app
@@ -66,7 +112,7 @@ async fn should_return_401_if_incorrect_credentials() {
         .post_signup(&json!({
             "email": email,
             "password": "abcd1234",
-            "requires2FA": true
+            "requires2FA": false
         }))
         .await;
     let response = app
@@ -87,7 +133,7 @@ async fn should_return_422_if_malformed_credentials() {
         .post_signup(&json!({
             "email": email,
             "password": "abcd1234",
-            "requires2FA": true
+            "requires2FA": false
         }))
         .await;
     let response = app
@@ -99,7 +145,7 @@ async fn should_return_422_if_malformed_credentials() {
     assert_eq!(response.status().as_u16(), 422);
     assert!(
         response
-            .json::<LoginResponse>()
+            .json::<RegularAuthResponse>()
             .await
             .expect("Could not deserialize response body to LoginResponse")
             .message
