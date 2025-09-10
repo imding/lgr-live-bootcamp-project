@@ -2,7 +2,7 @@ use {
     auth_service::{
         Application,
         app_state::{AppState, BannedTokenStoreType, TwoFactorStoreType},
-        services::{HashmapTwoFactorStore, HashmapUserStore, HashsetBannedTokenStore},
+        services::{HashmapTwoFactorStore, HashmapUserStore, HashsetBannedTokenStore, MockEmailClient},
         utils::constants::test,
     },
     reqwest::{
@@ -29,7 +29,8 @@ impl TestApp {
         let user_store = Arc::new(HashmapUserStore::default());
         let banned_token_store = Arc::new(HashsetBannedTokenStore::default());
         let two_factor_store = Arc::new(HashmapTwoFactorStore::default());
-        let app_state = AppState::new(banned_token_store.clone(), user_store, two_factor_store.clone());
+        let email_client = Arc::new(MockEmailClient);
+        let app_state = AppState::new(banned_token_store.clone(), user_store, two_factor_store.clone(), email_client);
         let app = Application::build(app_state, test::APP_ADDRESS).await.expect("Failed to build app");
         let address = format!("http://{}", app.address.clone());
 

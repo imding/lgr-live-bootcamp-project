@@ -82,3 +82,9 @@ impl Default for TwoFactorCode {
         Self(rng().random_range(100000..999999).to_string())
     }
 }
+
+impl AsRef<str> for TwoFactorCode {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}

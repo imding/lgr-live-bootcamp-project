@@ -81,22 +81,27 @@ pub async fn login(
         return Err(AuthAPIError::UnexpectedError);
     };
 
+    if status != StatusCode::OK {
+        return Ok((jar, (status, Json(response))));
+    }
+
     let Ok(auth_cookie) = generate_auth_cookie(&email)
     else {
         return Err(AuthAPIError::UnexpectedError);
     };
-    let updated_jar = jar.add(auth_cookie);
 
-    println!("{response:?}");
-
-    Ok((updated_jar, (status, Json(response))))
+    Ok((jar.add(auth_cookie), (status, Json(response))))
 }
 
 async fn handle_2fa(email: &Email, state: &AppState) -> Result<(StatusCode, LoginResponse), AuthAPIError> {
     let attempt_id = LoginAttemptId::default();
     let code = TwoFactorCode::default();
 
-    if state.two_factor_store.add_code(email.clone(), attempt_id.clone(), code).await.is_err() {
+    if state.two_factor_store.add_code(email.clone(), attempt_id.clone(), code.clone()).await.is_err() {
+        return Err(AuthAPIError::UnexpectedError);
+    }
+
+    if state.email_client.send_email(email, "Your 2FA", code.as_ref()).await.is_err() {
         return Err(AuthAPIError::UnexpectedError);
     }
 

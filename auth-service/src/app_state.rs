@@ -1,17 +1,22 @@
 use {
-    crate::domain::data_stores::{BannedTokenStore, TwoFactorStore, UserStore},
+    crate::domain::{
+        data_stores::{BannedTokenStore, TwoFactorStore, UserStore},
+        email_client::EmailClient,
+    },
     std::sync::Arc,
 };
 
 pub type UserStoreType = Arc<dyn UserStore>;
 pub type BannedTokenStoreType = Arc<dyn BannedTokenStore>;
 pub type TwoFactorStoreType = Arc<dyn TwoFactorStore>;
+pub type EmailClientType = Arc<dyn EmailClient>;
 
 #[derive(Clone)]
 pub struct AppState {
     pub user_store: UserStoreType,
     pub banned_token_store: BannedTokenStoreType,
     pub two_factor_store: TwoFactorStoreType,
+    pub email_client: EmailClientType,
 }
 
 impl AppState {
@@ -19,7 +24,8 @@ impl AppState {
         banned_token_store: BannedTokenStoreType,
         user_store: UserStoreType,
         two_factor_store: TwoFactorStoreType,
+        email_client: EmailClientType,
     ) -> Self {
-        Self { banned_token_store, user_store, two_factor_store }
+        Self { banned_token_store, user_store, two_factor_store, email_client }
     }
 }
