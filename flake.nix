@@ -1,55 +1,38 @@
 {
-  description = "Development environment";
-
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    flake-utils.url = "github:numtide/flake-utils";
+    nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
   };
 
-  outputs = { self, nixpkgs, flake-utils }:
-    flake-utils.lib.eachDefaultSystem (
-      system: let
-        pkgs = import nixpkgs {
-          inherit system;
-          config.allowUnfree = true;
-        };
-
-        commonPackages = with pkgs; [
-          git
-          helix
-          jujutsu
-          nil
-        ];
-
-        optionalPackages = {
-        };
-
-        getOptionalPackages = let
-          enabled = builtins.getEnv "NIX_SHELL_OPTIONS";
-          splitOptions = if enabled != "" then builtins.split " " enabled else [];
-          options = builtins.filter (x: builtins.isString x && x != "") splitOptions;
-        in
-          builtins.concatLists (map (opt:
-            if builtins.hasAttr opt optionalPackages
-            then optionalPackages.${opt}
-            else []
-          ) options);
-      in
-      {
-        devShells.default = pkgs.mkShellNoCC {
-          packages = commonPackages ++ getOptionalPackages;
+  outputs =
+    { nixpkgs, ... }:
+    let
+      forAllSystems =
+        function:
+        nixpkgs.lib.genAttrs nixpkgs.lib.systems.flakeExposed (
+          system: function nixpkgs.legacyPackages.${system}
+        );
+    in
+    {
+      devShells = forAllSystems (pkgs: {
+        default = pkgs.mkShell {
+          packages = with pkgs; [
+            git
+            helix
+            jujutsu
+            nil
+          ];
 
           shellHook = ''
-            if [ -f .config/helix.toml ]; then
-              mkdir -p ~/.config/helix
-              cp .config/helix.toml ~/.config/helix/config.toml
+            if [ -f .config/helix ]; then
+                cp -r .config/helix ~/.config/helix
             fi
 
             if [ -f .config/jujutsu.toml ]; then
-              cp .config/jujutsu.toml ~/.config/jj/config.toml
+                mkdir -p ~/.config/jj
+                cp .config/jujutsu.toml ~/.config/jj/config.toml
             fi
           '';
         };
-      }
-    );
+      });
+    };
 }
