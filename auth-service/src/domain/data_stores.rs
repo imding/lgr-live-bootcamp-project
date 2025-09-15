@@ -1,7 +1,7 @@
 use {
     crate::domain::{email::Email, password::Password, user::User},
     rand::{Rng, rng},
-    serde::{Deserialize, Serialize},
+    serde::{Deserialize, Deserializer, Serialize},
     uuid::Uuid,
 };
 
@@ -46,7 +46,7 @@ pub enum TwoFactorStoreError {
     UnexpectedError,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct LoginAttemptId(String);
 
 #[derive(Clone, Debug, PartialEq)]
@@ -86,5 +86,25 @@ impl Default for TwoFactorCode {
 impl AsRef<str> for TwoFactorCode {
     fn as_ref(&self) -> &str {
         &self.0
+    }
+}
+
+impl<'a> Deserialize<'a> for LoginAttemptId {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'a>,
+    {
+        let maybe_id = String::deserialize(deserializer)?;
+        LoginAttemptId::parse(&maybe_id).map_err(serde::de::Error::custom)
+    }
+}
+
+impl<'a> Deserialize<'a> for TwoFactorCode {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'a>,
+    {
+        let maybe_code = String::deserialize(deserializer)?;
+        TwoFactorCode::parse(&maybe_code).map_err(serde::de::Error::custom)
     }
 }

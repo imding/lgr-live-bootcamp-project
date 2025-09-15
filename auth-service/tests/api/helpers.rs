@@ -11,7 +11,6 @@ use {
         header::COOKIE,
     },
     serde::Serialize,
-    serde_json::json,
     std::sync::Arc,
     uuid::Uuid,
 };
@@ -93,14 +92,13 @@ impl TestApp {
             .expect("Failed to execute request.")
     }
 
-    pub async fn post_verify_2fa(&self, email: &str, attempt_id: &str, code: &str) -> Response {
+    pub async fn post_verify_2fa<Body>(&self, body: &Body) -> Response
+    where
+        Body: Serialize,
+    {
         self.http_client
             .post(format!("{}/verify-2fa", &self.address))
-            .json(&json!({
-                "email": email,
-                "loginAttemptId": attempt_id,
-                "2FACode": code
-            }))
+            .json(body)
             .send()
             .await
             .expect("Failed to execute request.")
