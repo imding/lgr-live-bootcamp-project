@@ -49,7 +49,7 @@ pub enum TwoFactorStoreError {
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct LoginAttemptId(String);
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct TwoFactorCode(String);
 
 impl LoginAttemptId {

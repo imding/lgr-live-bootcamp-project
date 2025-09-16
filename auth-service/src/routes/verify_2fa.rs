@@ -1,15 +1,20 @@
 use {
-    crate::domain::{
-        data_stores::{LoginAttemptId, TwoFactorCode},
-        email::Email,
-        error::AuthAPIError,
+    crate::{
+        app_state::AppState,
+        domain::{
+            data_stores::{LoginAttemptId, TwoFactorCode},
+            email::Email,
+            error::AuthAPIError,
+        },
+        utils::auth::generate_auth_cookie,
     },
     axum::{
         Json,
-        extract::{FromRequest, Request, rejection::JsonRejection::JsonDataError},
+        extract::{FromRequest, Request, State, rejection::JsonRejection::JsonDataError},
         http::StatusCode,
         response::IntoResponse,
     },
+    axum_extra::extract::CookieJar,
     serde::Deserialize,
 };
 
@@ -46,9 +51,29 @@ where
 }
 
 pub async fn verify_2fa(
+    state: State<AppState>,
+    jar: CookieJar,
     ValidatedJson(request): ValidatedJson<Verify2FARequest>,
 ) -> Result<impl IntoResponse, AuthAPIError> {
     println!("/verify-2fa");
 
-    Ok(StatusCode::OK)
+    let Ok((attempt_id, code)) = state.two_factor_store.get_code(&request.email).await
+    else {
+        return Err(AuthAPIError::IncorrectCredentials);
+    };
+
+    if request.login_attempt_id != attempt_id || request.two_factor_code != code {
+        return Err(AuthAPIError::IncorrectCredentials);
+    }
+
+    let Ok(auth_cookie) = generate_auth_cookie(&request.email)
+    else {
+        return Err(AuthAPIError::UnexpectedError);
+    };
+
+    if state.two_factor_store.remove_code(&request.email).await.is_err() {
+        return Err(AuthAPIError::UnexpectedError);
+    };
+
+    Ok((jar.add(auth_cookie), StatusCode::OK))
 }
