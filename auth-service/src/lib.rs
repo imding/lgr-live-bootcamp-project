@@ -17,7 +17,8 @@ use {
         routing::post,
     },
     serde::{Deserialize, Serialize},
-    std::{error::Error, io::Error as IoError},
+    sqlx::{PgPool, postgres::PgPoolOptions},
+    std::{error::Error, io::Error as IoError, time::Duration},
     tokio::net::TcpListener,
     tower_http::{cors::CorsLayer, services::ServeDir},
 };
@@ -56,8 +57,8 @@ impl Application {
     }
 
     pub async fn run(self) -> Result<(), IoError> {
-        axum::serve(self.listener, self.router).await?;
-        Ok(println!("listening on {}", &self.address))
+        println!("listening on {}", &self.address);
+        Ok(axum::serve(self.listener, self.router).await?)
     }
 }
 
@@ -76,4 +77,8 @@ impl IntoResponse for AuthAPIError {
 
         (status, body).into_response()
     }
+}
+
+pub async fn get_postgres_pool(url: &str) -> Result<PgPool, sqlx::Error> {
+    PgPoolOptions::new().max_connections(5).connect(url).await
 }
