@@ -1,5 +1,9 @@
 use {
-    crate::domain::{email::Email, password::Password, user::User},
+    crate::domain::{
+        email::Email,
+        password::Password,
+        user::{User, UserRow},
+    },
     rand::{Rng, rng},
     serde::{Deserialize, Deserializer, Serialize},
     uuid::Uuid,
@@ -8,7 +12,7 @@ use {
 #[async_trait::async_trait]
 pub trait UserStore: Send + Sync {
     async fn add_user(&self, user: User) -> Result<(), UserStoreError>;
-    async fn get_user(&self, email: &Email) -> Result<User, UserStoreError>;
+    async fn get_user(&self, email: &Email) -> Result<UserRow, UserStoreError>;
     async fn validate_user(&self, email: &Email, password: &Password) -> Result<(), UserStoreError>;
 }
 

@@ -2,8 +2,9 @@ use {
     auth_service::{
         Application,
         app_state::{AppState, BannedTokenStoreType, TwoFactorStoreType},
-        services::{HashmapTwoFactorStore, HashmapUserStore, HashsetBannedTokenStore, MockEmailClient},
-        utils::constants::test,
+        get_postgres_pool,
+        services::{HashmapTwoFactorStore, HashsetBannedTokenStore, MockEmailClient, PostgresUserStore},
+        utils::constants::{DATABASE_URL, test},
     },
     reqwest::{
         Client, ClientBuilder, Response, Url,
@@ -11,6 +12,7 @@ use {
         header::COOKIE,
     },
     serde::Serialize,
+    sqlx::{Executor, PgPool, migrate, postgres::PgPoolOptions},
     std::sync::Arc,
     uuid::Uuid,
 };
@@ -25,7 +27,7 @@ pub struct TestApp {
 
 impl TestApp {
     pub async fn new() -> Self {
-        let user_store = Arc::new(HashmapUserStore::default());
+        let user_store = Arc::new(PostgresUserStore::new(configure_postgresql().await));
         let banned_token_store = Arc::new(HashsetBannedTokenStore::default());
         let two_factor_store = Arc::new(HashmapTwoFactorStore::default());
         let email_client = Arc::new(MockEmailClient);
@@ -119,4 +121,33 @@ impl TestApp {
 
 pub fn get_random_email() -> String {
     format!("{}@example.com", Uuid::new_v4())
+}
+
+pub async fn configure_postgresql() -> PgPool {
+    let url = DATABASE_URL.to_owned();
+    let suffix = Uuid::new_v4().to_string();
+
+    configure_database(&url, &suffix).await;
+
+    let url = format!("{url}-{suffix}");
+
+    get_postgres_pool(&url).await.expect("Failed to create Postgres connection pool!")
+}
+
+async fn configure_database(url: &str, suffix: &str) {
+    let (url, name) = url.rsplit_once('/').unwrap();
+    let connection = PgPoolOptions::new()
+        .connect(&format!("{url}/postgres"))
+        .await
+        .expect("Failed to create Postgres connection pool.");
+
+    connection
+        .execute(format!(r#"create database "{name}-{suffix}";"#).as_str())
+        .await
+        .expect("Failed to create database.");
+
+    let url = format!("{url}/{name}-{suffix}");
+    let connection = PgPoolOptions::new().connect(&url).await.expect("Failed to create Postgres connection pool.");
+
+    migrate!().run(&connection).await.expect("Failed to migrate the database");
 }

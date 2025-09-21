@@ -1,0 +1,36 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "insert into users values ($1, $2, $3) returning *;",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "email",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "password_hash",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "requires_2fa",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Bool"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "4d46b0c3f3cfce226dc9e1610873aeaf5d2922732d9e8dc23bae01edfedaf55f"
+}

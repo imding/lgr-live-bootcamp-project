@@ -3,7 +3,7 @@ use {
         Application,
         app_state::AppState,
         get_postgres_pool,
-        services::{HashmapTwoFactorStore, HashmapUserStore, HashsetBannedTokenStore, MockEmailClient},
+        services::{HashmapTwoFactorStore, HashsetBannedTokenStore, MockEmailClient, PostgresUserStore},
         utils::constants::{DATABASE_URL, prod},
     },
     sqlx::{PgPool, migrate},
@@ -12,8 +12,8 @@ use {
 
 #[tokio::main]
 async fn main() {
-    let _ = configure_postgresql().await;
-    let user_store = HashmapUserStore::default();
+    let pool = configure_postgresql().await;
+    let user_store = PostgresUserStore::new(pool);
     let banned_token_store = HashsetBannedTokenStore::default();
     let two_factor_store = HashmapTwoFactorStore::default();
     let app_state = AppState::new(

@@ -18,7 +18,7 @@ use {
     },
     serde::{Deserialize, Serialize},
     sqlx::{PgPool, postgres::PgPoolOptions},
-    std::{error::Error, io::Error as IoError, time::Duration},
+    std::{error::Error, io::Error as IoError},
     tokio::net::TcpListener,
     tower_http::{cors::CorsLayer, services::ServeDir},
 };

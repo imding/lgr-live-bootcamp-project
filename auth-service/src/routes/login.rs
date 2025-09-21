@@ -69,7 +69,7 @@ pub async fn login(
         _ => return Err(AuthAPIError::InvalidCredentials),
     };
 
-    if user.password != password {
+    if user.verify_password_hash(password.as_ref()).await.is_err() {
         return Err(AuthAPIError::IncorrectCredentials);
     }
 

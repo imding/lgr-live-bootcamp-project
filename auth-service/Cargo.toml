@@ -9,6 +9,7 @@ rustflags = ["--cfg=sqlx_macros_unstable"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+argon2 = { version = "0.5.3", features = ["std"] }
 async-trait = "0.1.89"
 axum = "0.8.4"
 axum-extra = { version = "0.10.1", features = ["cookie"] }
