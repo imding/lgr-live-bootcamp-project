@@ -18,8 +18,8 @@ pub trait UserStore: Send + Sync {
 
 #[async_trait::async_trait]
 pub trait BannedTokenStore: Send + Sync {
-    async fn register(&self, tokens: Vec<&str>);
-    async fn check(&self, token: &str) -> bool;
+    async fn register(&self, tokens: Vec<&str>) -> Result<(), BannedTokenStoreError>;
+    async fn check(&self, token: &str) -> Result<bool, BannedTokenStoreError>;
 }
 
 #[derive(Debug, PartialEq)]
@@ -27,6 +27,11 @@ pub enum UserStoreError {
     InvalidCredentials,
     UserAlreadyExists,
     UserNotFound,
+    UnexpectedError,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum BannedTokenStoreError {
     UnexpectedError,
 }
 

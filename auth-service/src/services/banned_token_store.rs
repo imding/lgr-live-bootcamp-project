@@ -1,4 +1,8 @@
-use {crate::domain::data_stores::BannedTokenStore, std::collections::HashSet, tokio::sync::RwLock};
+use {
+    crate::domain::data_stores::{BannedTokenStore, BannedTokenStoreError},
+    std::collections::HashSet,
+    tokio::sync::RwLock,
+};
 
 pub struct HashsetBannedTokenStore {
     tokens: RwLock<HashSet<String>>,
@@ -12,7 +16,7 @@ impl Default for HashsetBannedTokenStore {
 
 #[async_trait::async_trait]
 impl BannedTokenStore for HashsetBannedTokenStore {
-    async fn register(&self, tokens: Vec<&str>) {
+    async fn register(&self, tokens: Vec<&str>) -> Result<(), BannedTokenStoreError> {
         let mut store_tokens = self.tokens.write().await;
 
         for token in tokens {
@@ -22,11 +26,13 @@ impl BannedTokenStore for HashsetBannedTokenStore {
 
             store_tokens.insert(token.to_string());
         }
+
+        Ok(())
     }
 
-    async fn check(&self, token: &str) -> bool {
+    async fn check(&self, token: &str) -> Result<bool, BannedTokenStoreError> {
         let store_tokens = self.tokens.read().await;
 
-        return store_tokens.contains(token);
+        Ok(store_tokens.contains(token))
     }
 }

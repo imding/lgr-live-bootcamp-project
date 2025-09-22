@@ -16,6 +16,7 @@ use {
         response::{IntoResponse, Response},
         routing::post,
     },
+    redis::{Client, RedisResult},
     serde::{Deserialize, Serialize},
     sqlx::{PgPool, postgres::PgPoolOptions},
     std::{error::Error, io::Error as IoError},
@@ -81,4 +82,10 @@ impl IntoResponse for AuthAPIError {
 
 pub async fn get_postgres_pool(url: &str) -> Result<PgPool, sqlx::Error> {
     PgPoolOptions::new().max_connections(5).connect(url).await
+}
+
+pub fn get_redis_client(host: &str) -> RedisResult<Client> {
+    let redis_url = format!("redis://{host}/");
+
+    redis::Client::open(redis_url)
 }

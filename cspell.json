@@ -1,5 +1,9 @@
 {
   "words": [
-    "reqwest"
+    "reqwest",
+    "sqlx",
+    "Hashset",
+    "datname",
+    "rsplit"
   ]
 }

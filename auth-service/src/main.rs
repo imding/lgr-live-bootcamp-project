@@ -2,10 +2,11 @@ use {
     auth_service::{
         Application,
         app_state::AppState,
-        get_postgres_pool,
-        services::{HashmapTwoFactorStore, HashsetBannedTokenStore, MockEmailClient, PostgresUserStore},
-        utils::constants::{DATABASE_URL, prod},
+        get_postgres_pool, get_redis_client,
+        services::{HashmapTwoFactorStore, MockEmailClient, PostgresUserStore, RedisBannedTokenStore},
+        utils::constants::{DATABASE_URL, REDIS_HOST_NAME, prod},
     },
+    redis::Connection as RedisConnection,
     sqlx::{PgPool, migrate},
     std::sync::Arc,
 };
@@ -13,8 +14,9 @@ use {
 #[tokio::main]
 async fn main() {
     let pool = configure_postgresql().await;
+    let redis = configure_redis();
     let user_store = PostgresUserStore::new(pool);
-    let banned_token_store = HashsetBannedTokenStore::default();
+    let banned_token_store = RedisBannedTokenStore::new(redis);
     let two_factor_store = HashmapTwoFactorStore::default();
     let app_state = AppState::new(
         Arc::new(banned_token_store),
@@ -35,4 +37,11 @@ async fn configure_postgresql() -> PgPool {
     migrate!().run(&pool).await.expect("Failed to run migrations");
 
     pool
+}
+
+fn configure_redis() -> RedisConnection {
+    get_redis_client(REDIS_HOST_NAME.as_str())
+        .expect("Failed to get Redis client")
+        .get_connection()
+        .expect("Failed to get Redis connection")
 }

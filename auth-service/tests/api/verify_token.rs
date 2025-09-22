@@ -24,7 +24,7 @@ async fn should_return_401_if_banned_token() {
     let email = Email::parse(&email).unwrap();
     let token = generate_auth_token(&email).unwrap();
 
-    app.banned_token_store.register(vec![&token]).await;
+    assert!(app.banned_token_store.register(vec![&token]).await.is_ok());
 
     let response = app.post_verify_token(&json!({ "token": token })).await;
 

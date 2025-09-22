@@ -2,9 +2,9 @@ use {
     auth_service::{
         Application,
         app_state::{AppState, BannedTokenStoreType, TwoFactorStoreType},
-        get_postgres_pool,
-        services::{HashmapTwoFactorStore, HashsetBannedTokenStore, MockEmailClient, PostgresUserStore},
-        utils::constants::{DATABASE_URL, test},
+        get_postgres_pool, get_redis_client,
+        services::{HashmapTwoFactorStore, MockEmailClient, PostgresUserStore, RedisBannedTokenStore},
+        utils::constants::{DATABASE_URL, REDIS_HOST_NAME, test},
     },
     reqwest::{
         Client, ClientBuilder, Response, Url,
@@ -41,8 +41,12 @@ impl Drop for TestApp {
 impl TestApp {
     pub async fn new() -> Self {
         let (pool, database_name) = configure_postgresql().await;
+        let redis = get_redis_client(REDIS_HOST_NAME.as_str())
+            .expect("Failed to get Redis client")
+            .get_connection()
+            .expect("Failed to get Redis connection");
         let user_store = Arc::new(PostgresUserStore::new(pool));
-        let banned_token_store = Arc::new(HashsetBannedTokenStore::default());
+        let banned_token_store = Arc::new(RedisBannedTokenStore::new(redis));
         let two_factor_store = Arc::new(HashmapTwoFactorStore::default());
         let email_client = Arc::new(MockEmailClient);
         let app_state = AppState::new(banned_token_store.clone(), user_store, two_factor_store.clone(), email_client);

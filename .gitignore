@@ -4,5 +4,4 @@
 .direnv
 .jj
 
-auth-service/.local.pg
-auth-service/.local.pg.log
+auth-service/.local.*

@@ -29,7 +29,11 @@ async fn should_return_200_if_valid_jwt_cookie() {
     let response = app.post_logout().await;
 
     assert_eq!(response.status().as_u16(), 200);
-    assert!(app.banned_token_store.check(token.value()).await);
+
+    let exists = app.banned_token_store.check(token.value()).await;
+
+    assert!(exists.is_ok());
+    assert!(exists.unwrap());
 
     app.clean_up().await;
 }

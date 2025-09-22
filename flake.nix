@@ -21,6 +21,7 @@
             jujutsu
             nil
             postgresql_15
+            redis
           ];
 
           shellHook = ''
@@ -52,6 +53,11 @@
 
                 echo 'Creating local database...'
                 createdb -h localhost -p 5432 -U $DB_USER $DB_NAME
+            fi
+
+            if ! redis-cli ping >/dev/null 2>&1; then
+                mkdir -p ./auth-service/.local.redis
+                redis-server --daemonize yes --port 6379 --dir ./auth-service/.local.redis
             fi
           '';
         };

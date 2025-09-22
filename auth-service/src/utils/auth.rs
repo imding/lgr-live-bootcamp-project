@@ -22,6 +22,7 @@ pub enum GenerateTokenError {
 pub enum ValidateTokenError {
     TokenError(JwtError),
     BannedToken,
+    UnexpectedError,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -38,7 +39,12 @@ pub fn generate_auth_cookie(email: &Email) -> Result<Cookie<'static>, GenerateTo
 
 pub async fn validate_token(store: Option<BannedTokenStoreType>, token: &str) -> Result<Claims, ValidateTokenError> {
     if let Some(store) = store {
-        if store.check(token).await {
+        let Ok(exists) = store.check(token).await
+        else {
+            return Err(ValidateTokenError::UnexpectedError);
+        };
+
+        if exists {
             return Err(ValidateTokenError::BannedToken);
         }
     }
