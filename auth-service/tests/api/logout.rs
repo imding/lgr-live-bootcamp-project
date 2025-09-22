@@ -7,7 +7,7 @@ use {
 
 #[tokio::test]
 async fn should_return_200_if_valid_jwt_cookie() {
-    let app = TestApp::new().await;
+    let mut app = TestApp::new().await;
     let email = get_random_email();
     let password = "abcd1234";
 
@@ -30,11 +30,13 @@ async fn should_return_200_if_valid_jwt_cookie() {
 
     assert_eq!(response.status().as_u16(), 200);
     assert!(app.banned_token_store.check(token.value()).await);
+
+    app.clean_up().await;
 }
 
 #[tokio::test]
 async fn should_return_400_if_logout_called_twice_in_a_row() {
-    let app = TestApp::new().await;
+    let mut app = TestApp::new().await;
     let email = get_random_email();
     let password = "abcd1234";
 
@@ -60,11 +62,13 @@ async fn should_return_400_if_logout_called_twice_in_a_row() {
         response.json::<ErrorResponse>().await.expect("Could not deserialize response body to ErrorResponse").error,
         "Missing token".to_string()
     );
+
+    app.clean_up().await;
 }
 
 #[tokio::test]
 async fn should_return_400_if_jwt_cookie_missing() {
-    let app = TestApp::new().await;
+    let mut app = TestApp::new().await;
     let response = app.post_logout().await;
 
     assert_eq!(response.status().as_u16(), 400);
@@ -72,11 +76,13 @@ async fn should_return_400_if_jwt_cookie_missing() {
         response.json::<ErrorResponse>().await.expect("Could not deserialize response body to ErrorResponse").error,
         "Missing token".to_string()
     );
+
+    app.clean_up().await;
 }
 
 #[tokio::test]
 async fn should_return_401_if_invalid_token() {
-    let app = TestApp::new().await;
+    let mut app = TestApp::new().await;
 
     app.cookie_jar.add_cookie_str(
         &format!("{JWT_COOKIE_NAME}=invalid; HttpOnly; SameSite=Lax; Secure; Path=/"),
@@ -90,4 +96,6 @@ async fn should_return_401_if_invalid_token() {
         response.json::<ErrorResponse>().await.expect("Could not deserialize response body to ErrorResponse").error,
         "Invalid token".to_string()
     );
+
+    app.clean_up().await;
 }

@@ -11,7 +11,7 @@ use {
 
 #[tokio::test]
 async fn should_return_200_if_valid_credentials_and_2fa_disabled() {
-    let app = TestApp::new().await;
+    let mut app = TestApp::new().await;
     let email = get_random_email();
     let password = "abcd1234";
     let response = app
@@ -36,11 +36,13 @@ async fn should_return_200_if_valid_credentials_and_2fa_disabled() {
     let cookie = response.cookies().find(|cookie| cookie.name() == JWT_COOKIE_NAME).expect("No auth cookie found");
 
     assert!(!cookie.value().is_empty());
+
+    app.clean_up().await;
 }
 
 #[tokio::test]
 async fn should_return_206_if_valid_credentials_and_2fa_enabled() {
-    let app = TestApp::new().await;
+    let mut app = TestApp::new().await;
     let email = get_random_email();
     let password = "abcd1234";
     let response = app
@@ -77,11 +79,13 @@ async fn should_return_206_if_valid_credentials_and_2fa_enabled() {
     let (attempt_id, _) = maybe_value.unwrap();
 
     assert_eq!(body.login_attempt_id, attempt_id);
+
+    app.clean_up().await;
 }
 
 #[tokio::test]
 async fn should_return_400_if_invalid_input() {
-    let app = TestApp::new().await;
+    let mut app = TestApp::new().await;
     let email = get_random_email();
     let _ = app
         .post_signup(&json!({
@@ -101,12 +105,14 @@ async fn should_return_400_if_invalid_input() {
     assert_eq!(
         response.json::<ErrorResponse>().await.expect("Could not deserialize response body to ErrorResponse").error,
         "Invalid credentials".to_owned()
-    )
+    );
+
+    app.clean_up().await;
 }
 
 #[tokio::test]
 async fn should_return_401_if_incorrect_credentials() {
-    let app = TestApp::new().await;
+    let mut app = TestApp::new().await;
     let email = get_random_email();
     let _ = app
         .post_signup(&json!({
@@ -123,11 +129,13 @@ async fn should_return_401_if_incorrect_credentials() {
         .await;
 
     assert_eq!(response.status().as_u16(), 401);
+
+    app.clean_up().await;
 }
 
 #[tokio::test]
 async fn should_return_422_if_malformed_credentials() {
-    let app = TestApp::new().await;
+    let mut app = TestApp::new().await;
     let email = get_random_email();
     let _ = app
         .post_signup(&json!({
@@ -150,5 +158,7 @@ async fn should_return_422_if_malformed_credentials() {
             .expect("Could not deserialize response body to LoginResponse")
             .message
             .starts_with("Failed to deserialize the JSON body into the target type"),
-    )
+    );
+
+    app.clean_up().await;
 }
