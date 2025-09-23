@@ -5,6 +5,7 @@ use {
     },
     axum::{Json, extract::State, http::StatusCode, response::IntoResponse},
     serde::{Deserialize, Serialize},
+    tracing::instrument,
 };
 
 #[derive(Deserialize)]
@@ -20,6 +21,7 @@ pub struct SignupResponse {
     pub message: String,
 }
 
+#[instrument(name = "Signup", skip_all, err(Debug))]
 pub async fn signup(
     state: State<AppState>,
     Json(request): Json<SignupRequest>,

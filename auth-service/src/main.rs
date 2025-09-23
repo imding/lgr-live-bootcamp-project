@@ -4,7 +4,10 @@ use {
         app_state::AppState,
         get_postgres_pool, get_redis_client,
         services::{MockEmailClient, PostgresUserStore, RedisBannedTokenStore, RedisTwoFactorStore},
-        utils::constants::{DATABASE_URL, REDIS_HOST_NAME, prod},
+        utils::{
+            constants::{DATABASE_URL, REDIS_HOST_NAME, prod},
+            tracing::init_tracing,
+        },
     },
     redis::Connection as RedisConnection,
     sqlx::{PgPool, migrate},
@@ -13,6 +16,8 @@ use {
 
 #[tokio::main]
 async fn main() {
+    init_tracing();
+
     let pool = configure_postgresql().await;
     let user_store = PostgresUserStore::new(pool);
     let banned_token_store = RedisBannedTokenStore::new(configure_redis());

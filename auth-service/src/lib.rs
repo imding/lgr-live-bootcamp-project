@@ -8,6 +8,7 @@ use {
     crate::{
         domain::error::AuthAPIError,
         routes::{login, logout, signup, verify_2fa, verify_token},
+        utils::tracing::{make_span_with_request_id, on_request, on_response},
     },
     app_state::AppState,
     axum::{
@@ -21,7 +22,8 @@ use {
     sqlx::{PgPool, postgres::PgPoolOptions},
     std::{error::Error, io::Error as IoError},
     tokio::net::TcpListener,
-    tower_http::{cors::CorsLayer, services::ServeDir},
+    tower_http::{cors::CorsLayer, services::ServeDir, trace::TraceLayer},
+    tracing::info,
 };
 
 pub struct Application {
@@ -49,7 +51,13 @@ impl Application {
             .route("/verify-2fa", post(verify_2fa))
             .route("/verify-token", post(verify_token))
             .with_state(app_state)
-            .layer(cors);
+            .layer(cors)
+            .layer(
+                TraceLayer::new_for_http()
+                    .make_span_with(make_span_with_request_id)
+                    .on_request(on_request)
+                    .on_response(on_response),
+            );
 
         let listener = tokio::net::TcpListener::bind(address).await?;
         let address = listener.local_addr()?.to_string();
@@ -58,7 +66,8 @@ impl Application {
     }
 
     pub async fn run(self) -> Result<(), IoError> {
-        println!("listening on {}", &self.address);
+        info!("listening on {}", &self.address);
+
         Ok(axum::serve(self.listener, self.router).await?)
     }
 }

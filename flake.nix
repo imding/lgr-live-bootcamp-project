@@ -41,18 +41,18 @@
 
             pg_ctl stop -D $DB_PATH
 
-            if [ -f auth-service/.local.pg ]; then
+            if [ -d "$DB_PATH" ] && [ -f "$DB_PATH/PG_VERSION" ]; then
                 echo 'Local Postgres data folder exists, starting...'
-                pg_ctl start -D $DB_PATH -l $DB_LOG_PATH
+                pg_ctl start -D "$DB_PATH" -l "$DB_LOG_PATH"
             else
                 echo 'Initialising local database...'
-                pg_ctl init -D $DB_PATH -o "-E UTF8 -U $DB_USER"
+                pg_ctl init -D "$DB_PATH" -o "-E UTF8 -U $DB_USER"
 
                 echo 'Starting local database...'
-                pg_ctl start -D $DB_PATH -l $DB_LOG_PATH
+                pg_ctl start -D "$DB_PATH" -l "$DB_LOG_PATH"
 
                 echo 'Creating local database...'
-                createdb -h localhost -p 5432 -U $DB_USER $DB_NAME
+                createdb --if-not-exists -h localhost -p 5432 -U "$DB_USER" "$DB_NAME"
             fi
 
             if ! redis-cli ping >/dev/null 2>&1; then
