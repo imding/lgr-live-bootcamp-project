@@ -62,11 +62,17 @@ pub struct LoginAttemptId(String);
 pub struct TwoFactorCode(String);
 
 impl LoginAttemptId {
-    pub fn parse(code: &str) -> Result<Self, String> {
-        match Uuid::parse_str(code) {
+    pub fn parse(maybe_uuid: &str) -> Result<Self, String> {
+        match Uuid::parse_str(maybe_uuid) {
             Ok(uuid) => Ok(Self(uuid.to_string())),
             Err(error) => Err(error.to_string()),
         }
+    }
+}
+
+impl AsRef<str> for LoginAttemptId {
+    fn as_ref(&self) -> &str {
+        &self.0
     }
 }
 
@@ -86,15 +92,15 @@ impl TwoFactorCode {
     }
 }
 
-impl Default for TwoFactorCode {
-    fn default() -> Self {
-        Self(rng().random_range(100000..999999).to_string())
-    }
-}
-
 impl AsRef<str> for TwoFactorCode {
     fn as_ref(&self) -> &str {
         &self.0
+    }
+}
+
+impl Default for TwoFactorCode {
+    fn default() -> Self {
+        Self(rng().random_range(100000..999999).to_string())
     }
 }
 

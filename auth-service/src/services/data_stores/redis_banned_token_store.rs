@@ -44,7 +44,7 @@ impl BannedTokenStore for RedisBannedTokenStore {
                 continue;
             }
 
-            if connection.set_ex::<String, bool>(get_key(token), true, TOKEN_TTL_SECONDS as u64).is_err() {
+            if connection.set_ex(get_key(token), true, TOKEN_TTL_SECONDS as u64).is_err() {
                 return Err(BannedTokenStoreError::UnexpectedError);
             }
         }

@@ -3,7 +3,7 @@ use {
         Application,
         app_state::AppState,
         get_postgres_pool, get_redis_client,
-        services::{HashmapTwoFactorStore, MockEmailClient, PostgresUserStore, RedisBannedTokenStore},
+        services::{MockEmailClient, PostgresUserStore, RedisBannedTokenStore, RedisTwoFactorStore},
         utils::constants::{DATABASE_URL, REDIS_HOST_NAME, prod},
     },
     redis::Connection as RedisConnection,
@@ -14,10 +14,9 @@ use {
 #[tokio::main]
 async fn main() {
     let pool = configure_postgresql().await;
-    let redis = configure_redis();
     let user_store = PostgresUserStore::new(pool);
-    let banned_token_store = RedisBannedTokenStore::new(redis);
-    let two_factor_store = HashmapTwoFactorStore::default();
+    let banned_token_store = RedisBannedTokenStore::new(configure_redis());
+    let two_factor_store = RedisTwoFactorStore::new(configure_redis());
     let app_state = AppState::new(
         Arc::new(banned_token_store),
         Arc::new(user_store),

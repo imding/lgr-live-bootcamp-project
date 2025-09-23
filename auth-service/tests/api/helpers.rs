@@ -3,9 +3,10 @@ use {
         Application,
         app_state::{AppState, BannedTokenStoreType, TwoFactorStoreType},
         get_postgres_pool, get_redis_client,
-        services::{HashmapTwoFactorStore, MockEmailClient, PostgresUserStore, RedisBannedTokenStore},
+        services::{MockEmailClient, PostgresUserStore, RedisBannedTokenStore, RedisTwoFactorStore},
         utils::constants::{DATABASE_URL, REDIS_HOST_NAME, test},
     },
+    redis::Connection as RedisConnection,
     reqwest::{
         Client, ClientBuilder, Response, Url,
         cookie::{CookieStore, Jar},
@@ -41,13 +42,9 @@ impl Drop for TestApp {
 impl TestApp {
     pub async fn new() -> Self {
         let (pool, database_name) = configure_postgresql().await;
-        let redis = get_redis_client(REDIS_HOST_NAME.as_str())
-            .expect("Failed to get Redis client")
-            .get_connection()
-            .expect("Failed to get Redis connection");
         let user_store = Arc::new(PostgresUserStore::new(pool));
-        let banned_token_store = Arc::new(RedisBannedTokenStore::new(redis));
-        let two_factor_store = Arc::new(HashmapTwoFactorStore::default());
+        let banned_token_store = Arc::new(RedisBannedTokenStore::new(configure_redis()));
+        let two_factor_store = Arc::new(RedisTwoFactorStore::new(configure_redis()));
         let email_client = Arc::new(MockEmailClient);
         let app_state = AppState::new(banned_token_store.clone(), user_store, two_factor_store.clone(), email_client);
         let app = Application::build(app_state, test::APP_ADDRESS).await.expect("Failed to build app");
@@ -205,4 +202,11 @@ async fn delete_database(name: &str) {
         .expect("Failed to drop the database");
 
     connection.execute(format!(r#"drop database "{name}";"#).as_str()).await.expect("Failed to drop the database");
+}
+
+fn configure_redis() -> RedisConnection {
+    get_redis_client(REDIS_HOST_NAME.as_str())
+        .expect("Failed to get Redis client")
+        .get_connection()
+        .expect("Failed to get Redis connection")
 }
