@@ -1,7 +1,7 @@
 use {
     crate::domain::{email::Email, password::Password},
     argon2::{Argon2, PasswordHash, PasswordVerifier},
-    std::error::Error,
+    color_eyre::Result,
     tokio::task::spawn_blocking,
     tracing::{Span, instrument},
 };
@@ -26,7 +26,7 @@ impl User {
     }
 
     #[instrument(name = "Convert user to row", skip_all)]
-    pub async fn into_row(&self) -> Result<UserRow, Box<dyn Error + Send + Sync>> {
+    pub async fn into_row(&self) -> Result<UserRow> {
         let current_span = Span::current();
         let password = self.password.to_owned();
         let password_hash = spawn_blocking(move || current_span.in_scope(|| password.hash())).await??;
@@ -37,7 +37,7 @@ impl User {
 
 impl UserRow {
     #[instrument(name = "Verify password hash", skip_all)]
-    pub async fn verify_password_hash(&self, target: &str) -> Result<(), Box<dyn Error>> {
+    pub async fn verify_password_hash(&self, target: &str) -> Result<()> {
         let current_span = Span::current();
         let hash = self.password_hash.to_owned();
         let target = target.to_owned();

@@ -23,9 +23,9 @@ impl UserStore for HashmapUserStore {
             return Err(UserStoreError::UserAlreadyExists);
         }
 
-        let Ok(user_row) = user.into_row().await
-        else {
-            return Err(UserStoreError::UnexpectedError);
+        let user_row = match user.into_row().await {
+            Ok(v) => v,
+            Err(e) => return Err(UserStoreError::UnexpectedError(e)),
         };
 
         users.insert(user.email.clone(), user_row);

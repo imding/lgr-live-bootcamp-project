@@ -17,6 +17,7 @@ use {
     },
     axum_extra::extract::CookieJar,
     serde::{Deserialize, Serialize},
+    tracing::instrument,
 };
 
 #[derive(Deserialize)]
@@ -44,18 +45,16 @@ pub struct TwoFactorAuthResponse {
     pub login_attempt_id: LoginAttemptId,
 }
 
+#[instrument(name = "Signup", skip_all)]
 pub async fn login(
     state: State<AppState>,
     jar: CookieJar,
     payload: Result<Json<LoginRequest>, JsonRejection>,
 ) -> Result<(CookieJar, impl IntoResponse), AuthAPIError> {
-    println!("/login");
     let Json(request) = match payload {
         Ok(request_json) => request_json,
         Err(rejection) => {
             let message = rejection.body_text();
-
-            eprintln!("{message}");
 
             return Ok((jar, (rejection.status(), Json(LoginResponse::RegularAuth(RegularAuthResponse { message })))));
         }
@@ -73,37 +72,33 @@ pub async fn login(
         return Err(AuthAPIError::IncorrectCredentials);
     }
 
-    let Ok((status, response)) = (match user.requires_2fa {
+    let (status, response) = (match user.requires_2fa {
         true => handle_2fa(&email, &state).await,
         false => handle_no_2fa().await,
     })
-    else {
-        return Err(AuthAPIError::UnexpectedError);
-    };
+    .map_err(|e| AuthAPIError::UnexpectedError(e.into()))?;
 
     if status != StatusCode::OK {
         return Ok((jar, (status, Json(response))));
     }
 
-    let Ok(auth_cookie) = generate_auth_cookie(&email)
-    else {
-        return Err(AuthAPIError::UnexpectedError);
-    };
+    let auth_cookie = generate_auth_cookie(&email).map_err(|e| AuthAPIError::UnexpectedError(e.into()))?;
 
     Ok((jar.add(auth_cookie), (status, Json(response))))
 }
 
+#[instrument(name = "Handle 2FA", skip_all)]
 async fn handle_2fa(email: &Email, state: &AppState) -> Result<(StatusCode, LoginResponse), AuthAPIError> {
     let attempt_id = LoginAttemptId::default();
     let code = TwoFactorCode::default();
 
-    if state.two_factor_store.add_code(email.clone(), attempt_id.clone(), code.clone()).await.is_err() {
-        return Err(AuthAPIError::UnexpectedError);
-    }
+    state
+        .two_factor_store
+        .add_code(email.clone(), attempt_id.clone(), code.clone())
+        .await
+        .map_err(|e| AuthAPIError::UnexpectedError(e.into()))?;
 
-    if state.email_client.send_email(email, "Your 2FA", code.as_ref()).await.is_err() {
-        return Err(AuthAPIError::UnexpectedError);
-    }
+    state.email_client.send_email(email, "Your 2FA", code.as_ref()).await.map_err(AuthAPIError::UnexpectedError)?;
 
     Ok((
         StatusCode::PARTIAL_CONTENT,
@@ -114,6 +109,7 @@ async fn handle_2fa(email: &Email, state: &AppState) -> Result<(StatusCode, Logi
     ))
 }
 
+#[instrument(name = "Handle no 2FA", skip_all)]
 async fn handle_no_2fa() -> Result<(StatusCode, LoginResponse), AuthAPIError> {
     return Ok((
         StatusCode::OK,

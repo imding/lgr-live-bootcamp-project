@@ -6,16 +6,24 @@ use {
     },
     axum_extra::extract::cookie::{Cookie, SameSite},
     chrono::{Duration, Utc},
+    color_eyre::{
+        Report,
+        eyre::{Context, ContextCompat as _, Result, eyre},
+    },
     jsonwebtoken::{DecodingKey, EncodingKey, Header, Validation, decode, encode, errors::Error as JwtError},
     serde::{Deserialize, Serialize},
+    thiserror::Error,
+    tracing::instrument,
 };
 
 pub const TOKEN_TTL_SECONDS: i64 = 600;
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum GenerateTokenError {
+    #[error("Token error")]
     TokenError(JwtError),
-    UnexpectedError,
+    #[error("Unexpected error")]
+    UnexpectedError(#[source] Report),
 }
 
 #[derive(Debug)]
@@ -31,12 +39,14 @@ pub struct Claims {
     pub sub: String,
 }
 
-pub fn generate_auth_cookie(email: &Email) -> Result<Cookie<'static>, GenerateTokenError> {
+#[instrument(name = "Generate auth cookie", skip_all)]
+pub fn generate_auth_cookie(email: &Email) -> Result<Cookie<'static>> {
     let token = generate_auth_token(email)?;
 
     Ok(create_auth_cookie(token))
 }
 
+#[instrument(name = "Validate token", skip_all)]
 pub async fn validate_token(store: Option<BannedTokenStoreType>, token: &str) -> Result<Claims, ValidateTokenError> {
     if let Some(store) = store {
         let Ok(exists) = store.check(token).await
@@ -57,28 +67,29 @@ pub async fn validate_token(store: Option<BannedTokenStoreType>, token: &str) ->
     }
 }
 
+#[instrument(name = "Create auth cookie", skip_all)]
 fn create_auth_cookie(token: String) -> Cookie<'static> {
     let cookie = Cookie::build((JWT_COOKIE_NAME, token)).path("/").http_only(true).same_site(SameSite::Lax).build();
 
     cookie
 }
 
-pub fn generate_auth_token(email: &Email) -> Result<String, GenerateTokenError> {
-    let delta = Duration::try_seconds(TOKEN_TTL_SECONDS).ok_or(GenerateTokenError::UnexpectedError)?;
-    let exp: usize = Utc::now()
-        .checked_add_signed(delta)
-        .ok_or(GenerateTokenError::UnexpectedError)?
-        .timestamp()
-        .try_into()
-        .map_err(|_| GenerateTokenError::UnexpectedError)?;
+#[instrument(name = "Generate auth token", skip_all)]
+pub fn generate_auth_token(email: &Email) -> Result<String> {
+    let delta = Duration::try_seconds(TOKEN_TTL_SECONDS).wrap_err("Failed to create 10 minutes time delta")?;
+    let exp =
+        Utc::now().checked_add_signed(delta).ok_or(eyre!("Failed to add 10 minutes to current time"))?.timestamp();
+    let exp: usize = exp.try_into().wrap_err(format!("Failed to cast exp time to usize. exp time: {exp}"))?;
     let sub = email.as_ref().to_owned();
     let claims = Claims { sub, exp };
 
-    create_token(&claims).map_err(GenerateTokenError::TokenError)
+    create_token(&claims)
 }
 
-fn create_token(claims: &Claims) -> Result<String, JwtError> {
+#[instrument(name = "Create token", skip_all)]
+fn create_token(claims: &Claims) -> Result<String> {
     encode(&Header::default(), &claims, &EncodingKey::from_secret(JWT_SECRET.as_bytes()))
+        .wrap_err("Failed to create token")
 }
 
 #[cfg(test)]

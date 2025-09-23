@@ -23,12 +23,9 @@ impl PostgresUserStore {
 impl UserStore for PostgresUserStore {
     #[instrument(name = "Add user to database", skip_all)]
     async fn add_user(&self, user: User) -> Result<(), UserStoreError> {
-        let Ok(user) = user.into_row().await
-        else {
-            return Err(UserStoreError::UnexpectedError);
-        };
+        let user = user.into_row().await.map_err(|e| UserStoreError::UnexpectedError(e.into()))?;
 
-        if query_as!(
+        query_as!(
             UserRow,
             r#"insert into users values ($1, $2, $3) returning *;"#,
             user.email,
@@ -37,21 +34,17 @@ impl UserStore for PostgresUserStore {
         )
         .fetch_one(&self.pool)
         .await
-        .is_err()
-        {
-            return Err(UserStoreError::UnexpectedError);
-        };
+        .map_err(|e| UserStoreError::UnexpectedError(e.into()))?;
 
         Ok(())
     }
 
     #[instrument(name = "Get user from database", skip_all)]
     async fn get_user(&self, email: &Email) -> Result<UserRow, UserStoreError> {
-        let Ok(user_row) =
-            query_as!(UserRow, r#"select * from users where email = $1;"#, email.as_ref()).fetch_one(&self.pool).await
-        else {
-            return Err(UserStoreError::UnexpectedError);
-        };
+        let user_row = query_as!(UserRow, r#"select * from users where email = $1;"#, email.as_ref())
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| UserStoreError::UnexpectedError(e.into()))?;
 
         Ok(user_row)
     }
@@ -60,9 +53,7 @@ impl UserStore for PostgresUserStore {
     async fn validate_user(&self, email: &Email, password: &Password) -> Result<(), UserStoreError> {
         let user = self.get_user(email).await?;
 
-        if user.verify_password_hash(password.as_ref()).await.is_err() {
-            return Err(UserStoreError::UnexpectedError);
-        }
+        user.verify_password_hash(password.as_ref()).await.map_err(|e| UserStoreError::UnexpectedError(e.into()))?;
 
         Ok(())
     }

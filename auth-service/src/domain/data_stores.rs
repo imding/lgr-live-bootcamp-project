@@ -4,10 +4,44 @@ use {
         password::Password,
         user::{User, UserRow},
     },
+    color_eyre::eyre::Report,
     rand::{Rng, rng},
     serde::{Deserialize, Deserializer, Serialize},
+    thiserror::Error,
     uuid::Uuid,
 };
+
+#[derive(Debug, Error)]
+pub enum UserStoreError {
+    #[error("Invalid credentials")]
+    InvalidCredentials,
+    #[error("User already exists")]
+    UserAlreadyExists,
+    #[error("User not found")]
+    UserNotFound,
+    #[error("Unexpected error")]
+    UnexpectedError(#[source] Report),
+}
+
+#[derive(Debug, Error)]
+pub enum BannedTokenStoreError {
+    #[error("Unexpected error")]
+    UnexpectedError(#[source] Report),
+}
+
+#[derive(Debug, Error)]
+pub enum TwoFactorStoreError {
+    #[error("Login attempt ID not found")]
+    LoginAttemptIdNotFound,
+    #[error("Unexpected error")]
+    UnexpectedError(#[source] Report),
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct LoginAttemptId(String);
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct TwoFactorCode(String);
 
 #[async_trait::async_trait]
 pub trait UserStore: Send + Sync {
@@ -20,19 +54,6 @@ pub trait UserStore: Send + Sync {
 pub trait BannedTokenStore: Send + Sync {
     async fn register(&self, tokens: Vec<&str>) -> Result<(), BannedTokenStoreError>;
     async fn check(&self, token: &str) -> Result<bool, BannedTokenStoreError>;
-}
-
-#[derive(Debug, PartialEq)]
-pub enum UserStoreError {
-    InvalidCredentials,
-    UserAlreadyExists,
-    UserNotFound,
-    UnexpectedError,
-}
-
-#[derive(Debug, PartialEq)]
-pub enum BannedTokenStoreError {
-    UnexpectedError,
 }
 
 #[async_trait::async_trait]
@@ -49,17 +70,33 @@ pub trait TwoFactorStore: Send + Sync {
     async fn get_code(&self, email: &Email) -> Result<(LoginAttemptId, TwoFactorCode), TwoFactorStoreError>;
 }
 
-#[derive(Debug, PartialEq)]
-pub enum TwoFactorStoreError {
-    LoginAttemptIdNotFound,
-    UnexpectedError,
+impl PartialEq for UserStoreError {
+    fn eq(&self, other: &Self) -> bool {
+        matches!(
+            (self, other),
+            (Self::InvalidCredentials, Self::InvalidCredentials) |
+                (Self::UserAlreadyExists, Self::UserAlreadyExists) |
+                (Self::UserNotFound, Self::UserNotFound) |
+                (Self::UnexpectedError(_), Self::UnexpectedError(_))
+        )
+    }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize)]
-pub struct LoginAttemptId(String);
+impl PartialEq for BannedTokenStoreError {
+    fn eq(&self, other: &Self) -> bool {
+        matches!((self, other), (Self::UnexpectedError(_), Self::UnexpectedError(_)))
+    }
+}
 
-#[derive(Clone, Debug, PartialEq, Serialize)]
-pub struct TwoFactorCode(String);
+impl PartialEq for TwoFactorStoreError {
+    fn eq(&self, other: &Self) -> bool {
+        matches!(
+            (self, other),
+            (Self::LoginAttemptIdNotFound, Self::LoginAttemptIdNotFound) |
+                (Self::UnexpectedError(_), Self::UnexpectedError(_))
+        )
+    }
+}
 
 impl LoginAttemptId {
     pub fn parse(maybe_uuid: &str) -> Result<Self, String> {

@@ -2,6 +2,7 @@ use {
     crate::{app_state::AppState, domain::error::AuthAPIError, utils::auth::validate_token},
     axum::{Json, extract::State, http::StatusCode, response::IntoResponse},
     serde::{Deserialize, Serialize},
+    tracing::instrument,
 };
 
 #[derive(Deserialize)]
@@ -14,12 +15,11 @@ struct VerifyTokenResponse {
     message: String,
 }
 
+#[instrument(name = "Verify token", skip_all)]
 pub async fn verify_token(
     state: State<AppState>,
     Json(request): Json<VerifyTokenRequest>,
 ) -> Result<impl IntoResponse, AuthAPIError> {
-    println!("/verify-token");
-
     let parts = request.token.split('.').collect::<Vec<_>>();
 
     if parts.len() != 3 {

@@ -9,6 +9,7 @@ use {
             tracing::init_tracing,
         },
     },
+    color_eyre::install,
     redis::Connection as RedisConnection,
     sqlx::{PgPool, migrate},
     std::sync::Arc,
@@ -16,7 +17,8 @@ use {
 
 #[tokio::main]
 async fn main() {
-    init_tracing();
+    install().expect("Failed to install color_eyre");
+    init_tracing().expect("Failed to initialise tracing");
 
     let pool = configure_postgresql().await;
     let user_store = PostgresUserStore::new(pool);

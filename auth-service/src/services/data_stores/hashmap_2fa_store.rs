@@ -30,18 +30,16 @@ impl TwoFactorStore for HashmapTwoFactorStore {
 
         match codes.remove(email) {
             Some(_) => Ok(()),
-            _ => Err(TwoFactorStoreError::UnexpectedError),
+            None => Err(TwoFactorStoreError::LoginAttemptIdNotFound),
         }
     }
 
     async fn get_code(&self, email: &Email) -> Result<(LoginAttemptId, TwoFactorCode), TwoFactorStoreError> {
         let codes = self.codes.read().await;
-        let Some(value) = codes.get(email)
-        else {
-            return Err(TwoFactorStoreError::UnexpectedError);
-        };
-
-        Ok((value.0.clone(), value.1.clone()))
+        match codes.get(email) {
+            Some(value) => Ok((value.0.clone(), value.1.clone())),
+            None => Err(TwoFactorStoreError::LoginAttemptIdNotFound),
+        }
     }
 }
 
@@ -66,7 +64,7 @@ mod tests {
         let code = TwoFactorCode::default();
         let attempt_id = LoginAttemptId::default();
 
-        assert_eq!(store.remove_code(&email).await, Err(TwoFactorStoreError::UnexpectedError));
+        assert_eq!(store.remove_code(&email).await, Err(TwoFactorStoreError::LoginAttemptIdNotFound));
         assert_eq!(store.add_code(email.clone(), attempt_id, code).await, Ok(()));
         assert_eq!(store.remove_code(&email).await, Ok(()));
     }
@@ -78,7 +76,7 @@ mod tests {
         let code = TwoFactorCode::default();
         let attempt_id = LoginAttemptId::default();
 
-        assert_eq!(store.get_code(&email).await, Err(TwoFactorStoreError::UnexpectedError));
+        assert_eq!(store.get_code(&email).await, Err(TwoFactorStoreError::LoginAttemptIdNotFound));
         assert_eq!(store.add_code(email.clone(), attempt_id.clone(), code.clone()).await, Ok(()));
 
         let value = store.get_code(&email).await;

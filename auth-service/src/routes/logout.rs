@@ -6,10 +6,11 @@ use {
     },
     axum::{extract::State, http::StatusCode, response::IntoResponse},
     axum_extra::extract::{CookieJar, cookie::Cookie},
+    tracing::instrument,
 };
 
+#[instrument(name = "Logout", skip_all)]
 pub async fn logout(state: State<AppState>, jar: CookieJar) -> Result<(CookieJar, impl IntoResponse), AuthAPIError> {
-    println!("/logout");
     let Some(cookie) = jar.get(JWT_COOKIE_NAME)
     else {
         return Err(AuthAPIError::MissingToken);
@@ -24,8 +25,8 @@ pub async fn logout(state: State<AppState>, jar: CookieJar) -> Result<(CookieJar
         return Err(AuthAPIError::InvalidToken);
     }
 
-    if state.banned_token_store.register(vec![&token]).await.is_err() {
-        return Err(AuthAPIError::UnexpectedError);
+    if let Err(e) = state.banned_token_store.register(vec![&token]).await {
+        return Err(AuthAPIError::UnexpectedError(e.into()));
     }
 
     Ok((jar.remove(Cookie::from((JWT_COOKIE_NAME, token))), StatusCode::OK))

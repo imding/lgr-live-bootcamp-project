@@ -21,12 +21,11 @@ pub struct SignupResponse {
     pub message: String,
 }
 
-#[instrument(name = "Signup", skip_all, err(Debug))]
+#[instrument(name = "Signup", skip_all)]
 pub async fn signup(
     state: State<AppState>,
     Json(request): Json<SignupRequest>,
 ) -> Result<impl IntoResponse, AuthAPIError> {
-    println!("/signup");
     let Ok(email) = Email::parse(&request.email)
     else {
         return Err(AuthAPIError::InvalidCredentials);
@@ -42,9 +41,7 @@ pub async fn signup(
 
     let user = User::new(&email, &password, request.requires_2fa);
 
-    if state.user_store.add_user(user).await.is_err() {
-        return Err(AuthAPIError::UnexpectedError);
-    }
+    state.user_store.add_user(user).await.map_err(|e| AuthAPIError::UnexpectedError(e.into()))?;
 
     Ok((StatusCode::CREATED, Json(SignupResponse { message: "User created successfully!".to_string() })))
 }

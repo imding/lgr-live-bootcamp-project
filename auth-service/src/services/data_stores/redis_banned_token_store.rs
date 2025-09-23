@@ -5,6 +5,7 @@ use {
     },
     redis::{Connection, TypedCommands},
     tokio::sync::RwLock,
+    tracing::instrument,
 };
 
 const BANNED_TOKEN_KEY_PREFIX: &str = "banned_token:";
@@ -21,31 +22,32 @@ impl RedisBannedTokenStore {
 
 #[async_trait::async_trait]
 impl BannedTokenStore for RedisBannedTokenStore {
+    #[instrument(name = "Check token in redis", skip_all)]
     async fn check(&self, token: &str) -> Result<bool, BannedTokenStoreError> {
         let mut connection = self.connection.write().await;
-        let Ok(exists) = connection.exists(get_key(token))
-        else {
-            return Err(BannedTokenStoreError::UnexpectedError);
-        };
 
-        return Ok(exists);
+        match connection.exists(get_key(token)) {
+            Ok(exists) => Ok(exists),
+            Err(e) => Err(BannedTokenStoreError::UnexpectedError(e.into())),
+        }
     }
 
+    #[instrument(name = "Add token to redis", skip_all)]
     async fn register(&self, tokens: Vec<&str>) -> Result<(), BannedTokenStoreError> {
         let mut connection = self.connection.write().await;
 
         for token in tokens {
-            let Ok(exists) = connection.exists(get_key(token))
-            else {
-                return Err(BannedTokenStoreError::UnexpectedError);
+            let exists = match connection.exists(get_key(token)) {
+                Ok(v) => v,
+                Err(e) => return Err(BannedTokenStoreError::UnexpectedError(e.into())),
             };
 
             if exists {
                 continue;
             }
 
-            if connection.set_ex(get_key(token), true, TOKEN_TTL_SECONDS as u64).is_err() {
-                return Err(BannedTokenStoreError::UnexpectedError);
+            if let Err(e) = connection.set_ex(get_key(token), true, TOKEN_TTL_SECONDS as u64) {
+                return Err(BannedTokenStoreError::UnexpectedError(e.into()));
             }
         }
 
@@ -54,5 +56,5 @@ impl BannedTokenStore for RedisBannedTokenStore {
 }
 
 fn get_key(token: &str) -> String {
-    format!("{BANNED_TOKEN_KEY_PREFIX} {token}")
+    format!("{BANNED_TOKEN_KEY_PREFIX}{token}")
 }

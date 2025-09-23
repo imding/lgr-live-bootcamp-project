@@ -1,13 +1,20 @@
 use {
     axum::{body::Body, extract::Request, response::Response},
+    color_eyre::eyre::Result,
     std::time::Duration,
     tracing::{Level, Span, event, field, span},
-    tracing_subscriber::fmt,
+    tracing_error::ErrorLayer,
+    tracing_subscriber::{EnvFilter, fmt, prelude::*, registry},
     uuid::Uuid,
 };
 
-pub fn init_tracing() {
-    fmt().compact().with_max_level(Level::DEBUG).init();
+pub fn init_tracing() -> Result<()> {
+    let format_layer = fmt::layer().compact();
+    let filter_layer = EnvFilter::try_from_default_env().or_else(|_| EnvFilter::try_new("info"))?;
+
+    registry().with(filter_layer).with(format_layer).with(ErrorLayer::default()).init();
+
+    Ok(())
 }
 
 pub fn make_span_with_request_id(request: &Request<Body>) -> Span {

@@ -16,6 +16,7 @@ use {
     },
     axum_extra::extract::CookieJar,
     serde::Deserialize,
+    tracing::instrument,
 };
 
 #[derive(Deserialize)]
@@ -50,13 +51,12 @@ where
     }
 }
 
+#[instrument(name = "Verify two factor", skip_all)]
 pub async fn verify_2fa(
     state: State<AppState>,
     jar: CookieJar,
     ValidatedJson(request): ValidatedJson<Verify2FARequest>,
 ) -> Result<impl IntoResponse, AuthAPIError> {
-    println!("/verify-2fa");
-
     let Ok((attempt_id, code)) = state.two_factor_store.get_code(&request.email).await
     else {
         return Err(AuthAPIError::IncorrectCredentials);
@@ -66,13 +66,13 @@ pub async fn verify_2fa(
         return Err(AuthAPIError::IncorrectCredentials);
     }
 
-    let Ok(auth_cookie) = generate_auth_cookie(&request.email)
-    else {
-        return Err(AuthAPIError::UnexpectedError);
+    let auth_cookie = match generate_auth_cookie(&request.email) {
+        Ok(auth_cookie) => auth_cookie,
+        Err(e) => return Err(AuthAPIError::UnexpectedError(e)),
     };
 
-    if state.two_factor_store.remove_code(&request.email).await.is_err() {
-        return Err(AuthAPIError::UnexpectedError);
+    if let Err(e) = state.two_factor_store.remove_code(&request.email).await {
+        return Err(AuthAPIError::UnexpectedError(e.into()));
     };
 
     Ok((jar.add(auth_cookie), StatusCode::OK))

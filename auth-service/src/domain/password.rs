@@ -3,7 +3,8 @@ use {
         Algorithm, Argon2, Params, PasswordHasher, Version,
         password_hash::{SaltString, rand_core::OsRng},
     },
-    std::{convert::AsRef, error::Error},
+    color_eyre::Result as ColorResult,
+    std::convert::AsRef,
 };
 
 #[derive(Clone, Debug, PartialEq)]
@@ -24,7 +25,7 @@ impl Password {
         Ok(Password(maybe_password.to_owned()))
     }
 
-    pub fn hash(&self) -> Result<String, Box<dyn Error + Send + Sync>> {
+    pub fn hash(&self) -> ColorResult<String> {
         let salt = SaltString::generate(&mut OsRng);
         let password_hash = Argon2::new(Algorithm::Argon2id, Version::V0x13, Params::new(15000, 2, 1, None)?)
             .hash_password(self.as_ref().as_bytes(), &salt)?

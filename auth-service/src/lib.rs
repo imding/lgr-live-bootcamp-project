@@ -23,7 +23,7 @@ use {
     std::{error::Error, io::Error as IoError},
     tokio::net::TcpListener,
     tower_http::{cors::CorsLayer, services::ServeDir, trace::TraceLayer},
-    tracing::info,
+    tracing::{error, info},
 };
 
 pub struct Application {
@@ -74,6 +74,8 @@ impl Application {
 
 impl IntoResponse for AuthAPIError {
     fn into_response(self) -> Response {
+        log_error_chain(&self);
+
         let (status, error_message) = match self {
             AuthAPIError::IncorrectCredentials => (StatusCode::UNAUTHORIZED, "Incorrect credentials"),
             AuthAPIError::InvalidCredentials => (StatusCode::BAD_REQUEST, "Invalid credentials"),
@@ -81,7 +83,7 @@ impl IntoResponse for AuthAPIError {
             AuthAPIError::MissingToken => (StatusCode::BAD_REQUEST, "Missing token"),
             AuthAPIError::MalformedToken => (StatusCode::UNPROCESSABLE_ENTITY, "Malformed token"),
             AuthAPIError::UserAlreadyExists => (StatusCode::CONFLICT, "User already exists"),
-            AuthAPIError::UnexpectedError => (StatusCode::INTERNAL_SERVER_ERROR, "Unexpected error"),
+            AuthAPIError::UnexpectedError(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Unexpected error"),
         };
         let body = Json(ErrorResponse { error: error_message.to_string() });
 
@@ -97,4 +99,21 @@ pub fn get_redis_client(host: &str) -> RedisResult<Client> {
     let redis_url = format!("redis://{host}/");
 
     redis::Client::open(redis_url)
+}
+
+fn log_error_chain(e: &(dyn Error + 'static)) {
+    let separator = "\n---------------------------------------------\n";
+    let mut report = format!("{separator}{e:?}\n");
+    let mut current = e.source();
+
+    while let Some(cause) = current {
+        let str = format!("Caused by:\n\n{cause:?}");
+
+        report = format!("{report}\n{str}");
+        current = cause.source();
+    }
+
+    report = format!("{report}\n{separator}");
+
+    error!("{report}");
 }
