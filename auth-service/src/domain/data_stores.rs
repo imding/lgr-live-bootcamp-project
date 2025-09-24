@@ -6,6 +6,7 @@ use {
     },
     color_eyre::eyre::Report,
     rand::{Rng, rng},
+    secrecy::{ExposeSecret, SecretBox},
     serde::{Deserialize, Deserializer, Serialize},
     thiserror::Error,
     uuid::Uuid,
@@ -37,11 +38,11 @@ pub enum TwoFactorStoreError {
     UnexpectedError(#[source] Report),
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize)]
-pub struct LoginAttemptId(String);
+#[derive(Debug)]
+pub struct LoginAttemptId(SecretBox<String>);
 
-#[derive(Clone, Debug, PartialEq, Serialize)]
-pub struct TwoFactorCode(String);
+#[derive(Debug)]
+pub struct TwoFactorCode(SecretBox<String>);
 
 #[async_trait::async_trait]
 pub trait UserStore: Send + Sync {
@@ -52,8 +53,8 @@ pub trait UserStore: Send + Sync {
 
 #[async_trait::async_trait]
 pub trait BannedTokenStore: Send + Sync {
-    async fn register(&self, tokens: Vec<&str>) -> Result<(), BannedTokenStoreError>;
-    async fn check(&self, token: &str) -> Result<bool, BannedTokenStoreError>;
+    async fn register(&self, tokens: Vec<&SecretBox<String>>) -> Result<(), BannedTokenStoreError>;
+    async fn check(&self, token: &SecretBox<String>) -> Result<bool, BannedTokenStoreError>;
 }
 
 #[async_trait::async_trait]
@@ -101,43 +102,42 @@ impl PartialEq for TwoFactorStoreError {
 impl LoginAttemptId {
     pub fn parse(maybe_uuid: &str) -> Result<Self, String> {
         match Uuid::parse_str(maybe_uuid) {
-            Ok(uuid) => Ok(Self(uuid.to_string())),
+            Ok(uuid) => Ok(Self(SecretBox::new(Box::new(uuid.to_string())))),
             Err(error) => Err(error.to_string()),
         }
     }
 }
 
-impl AsRef<str> for LoginAttemptId {
-    fn as_ref(&self) -> &str {
+impl AsRef<SecretBox<String>> for LoginAttemptId {
+    fn as_ref(&self) -> &SecretBox<String> {
         &self.0
     }
 }
 
 impl Default for LoginAttemptId {
     fn default() -> Self {
-        Self(Uuid::new_v4().to_string())
+        Self(SecretBox::new(Box::new(Uuid::new_v4().to_string())))
     }
 }
 
-impl TwoFactorCode {
-    pub fn parse(code: &str) -> Result<Self, String> {
-        if code.len() != 6 {
-            return Err(String::from("Invalid login attempt ID"));
-        }
-
-        Ok(TwoFactorCode(code.to_string()))
+impl PartialEq for LoginAttemptId {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.expose_secret() == other.0.expose_secret()
     }
 }
 
-impl AsRef<str> for TwoFactorCode {
-    fn as_ref(&self) -> &str {
-        &self.0
+impl Clone for LoginAttemptId {
+    fn clone(&self) -> Self {
+        Self(SecretBox::new(Box::new(self.0.expose_secret().clone())))
     }
 }
 
-impl Default for TwoFactorCode {
-    fn default() -> Self {
-        Self(rng().random_range(100000..999999).to_string())
+impl Serialize for LoginAttemptId {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_newtype_struct("LoginAttemptId", self.0.expose_secret())
     }
 }
 
@@ -148,6 +148,40 @@ impl<'a> Deserialize<'a> for LoginAttemptId {
     {
         let maybe_id = String::deserialize(deserializer)?;
         LoginAttemptId::parse(&maybe_id).map_err(serde::de::Error::custom)
+    }
+}
+
+impl TwoFactorCode {
+    pub fn parse(code: &str) -> Result<Self, String> {
+        if code.len() != 6 {
+            return Err(String::from("Invalid login attempt ID"));
+        }
+
+        Ok(TwoFactorCode(SecretBox::new(Box::new(code.to_string()))))
+    }
+}
+
+impl AsRef<SecretBox<String>> for TwoFactorCode {
+    fn as_ref(&self) -> &SecretBox<String> {
+        &self.0
+    }
+}
+
+impl Default for TwoFactorCode {
+    fn default() -> Self {
+        Self(SecretBox::new(Box::new(rng().random_range(100000..999999).to_string())))
+    }
+}
+
+impl PartialEq for TwoFactorCode {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.expose_secret() == other.0.expose_secret()
+    }
+}
+
+impl Clone for TwoFactorCode {
+    fn clone(&self) -> Self {
+        Self(SecretBox::new(Box::new(self.0.expose_secret().clone())))
     }
 }
 

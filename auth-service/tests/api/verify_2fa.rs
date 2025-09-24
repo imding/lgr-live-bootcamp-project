@@ -1,6 +1,7 @@
 use {
     crate::helpers::{TestApp, get_random_email},
     auth_service::{domain::email::Email, utils::constants::JWT_COOKIE_NAME},
+    secrecy::{ExposeSecret, SecretBox},
     serde_json::json,
 };
 
@@ -24,14 +25,14 @@ async fn should_return_200_if_correct_code() {
         .await;
     let (attempt_id, code) = app
         .two_factor_store
-        .get_code(&Email::parse(&email).unwrap())
+        .get_code(&Email::parse(&SecretBox::new(Box::new(email.clone()))).unwrap())
         .await
         .expect("Failed to get code from two factor store");
     let response = app
         .post_verify_2fa(&json!({
             "email": email,
-            "loginAttemptId": attempt_id,
-            "2FACode": code
+            "loginAttemptId": attempt_id.as_ref().expose_secret(),
+            "2FACode": code.as_ref().expose_secret()
         }))
         .await;
 
@@ -96,7 +97,7 @@ async fn should_return_401_if_old_code() {
         .await;
     let (attempt_id, code) = app
         .two_factor_store
-        .get_code(&Email::parse(&email).unwrap())
+        .get_code(&Email::parse(&SecretBox::new(Box::new(email.clone()))).unwrap())
         .await
         .expect("Failed to get code from two factor store");
     let _ = app
@@ -108,8 +109,8 @@ async fn should_return_401_if_old_code() {
     let response = app
         .post_verify_2fa(&json!({
             "email": email,
-            "loginAttemptId": attempt_id,
-            "2FACode": code
+            "loginAttemptId": attempt_id.as_ref().expose_secret(),
+            "2FACode": code.as_ref().expose_secret()
         }))
         .await;
 
@@ -138,21 +139,21 @@ async fn should_return_401_if_same_code_twice() {
         .await;
     let (attempt_id, code) = app
         .two_factor_store
-        .get_code(&Email::parse(&email).unwrap())
+        .get_code(&Email::parse(&SecretBox::new(Box::new(email.clone()))).unwrap())
         .await
         .expect("Failed to get code from two factor store");
     let _ = app
         .post_verify_2fa(&json!({
             "email": email,
-            "loginAttemptId": attempt_id,
-            "2FACode": code
+            "loginAttemptId": attempt_id.as_ref().expose_secret(),
+            "2FACode": code.as_ref().expose_secret()
         }))
         .await;
     let response = app
         .post_verify_2fa(&json!({
             "email": email,
-            "loginAttemptId": attempt_id,
-            "2FACode": code
+            "loginAttemptId": attempt_id.as_ref().expose_secret(),
+            "2FACode": code.as_ref().expose_secret()
         }))
         .await;
 

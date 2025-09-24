@@ -1,6 +1,7 @@
 use {
     crate::{app_state::AppState, domain::error::AuthAPIError, utils::auth::validate_token},
     axum::{Json, extract::State, http::StatusCode, response::IntoResponse},
+    secrecy::SecretBox,
     serde::{Deserialize, Serialize},
     tracing::instrument,
 };
@@ -26,7 +27,7 @@ pub async fn verify_token(
         return Err(AuthAPIError::MalformedToken);
     }
 
-    if validate_token(Some(state.banned_token_store.clone()), &request.token).await.is_err() {
+    if validate_token(Some(state.banned_token_store.clone()), &SecretBox::new(Box::new(request.token))).await.is_err() {
         return Err(AuthAPIError::InvalidToken);
     }
 

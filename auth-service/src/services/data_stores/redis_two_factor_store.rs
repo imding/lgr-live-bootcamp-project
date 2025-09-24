@@ -4,6 +4,7 @@ use {
         email::Email,
     },
     redis::{Connection, TypedCommands},
+    secrecy::ExposeSecret,
     serde::{Deserialize, Serialize},
     serde_json::{from_str, to_string},
     tokio::sync::RwLock,
@@ -35,8 +36,10 @@ impl TwoFactorStore for RedisTwoFactorStore {
         attempt_id: LoginAttemptId,
         code: TwoFactorCode,
     ) -> Result<(), TwoFactorStoreError> {
-        let tuple_string = match to_string(&TwoFactorTuple(attempt_id.as_ref().to_string(), code.as_ref().to_string()))
-        {
+        let tuple_string = match to_string(&TwoFactorTuple(
+            attempt_id.as_ref().expose_secret().to_string(),
+            code.as_ref().expose_secret().to_string(),
+        )) {
             Ok(string) => string,
             Err(e) => return Err(TwoFactorStoreError::UnexpectedError(e.into())),
         };
@@ -94,5 +97,5 @@ impl TwoFactorStore for RedisTwoFactorStore {
 }
 
 fn get_key(email: &Email) -> String {
-    format!("{TWO_FACTOR_PREFIX}{}", email.as_ref())
+    format!("{TWO_FACTOR_PREFIX}{}", email.as_ref().expose_secret())
 }

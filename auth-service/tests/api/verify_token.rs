@@ -1,6 +1,7 @@
 use {
     crate::helpers::{TestApp, get_random_email},
     auth_service::{domain::email::Email, utils::auth::generate_auth_token},
+    secrecy::{ExposeSecret, SecretBox},
     serde_json::json,
 };
 
@@ -8,9 +9,9 @@ use {
 async fn should_return_200_if_malformed_input() {
     let mut app = TestApp::new().await;
     let email = get_random_email();
-    let email = Email::parse(&email).unwrap();
+    let email = Email::parse(&SecretBox::new(Box::new(email))).unwrap();
     let token = generate_auth_token(&email).unwrap();
-    let response = app.post_verify_token(&json!({ "token": token })).await;
+    let response = app.post_verify_token(&json!({ "token": token.expose_secret() })).await;
 
     assert_eq!(response.status().as_u16(), 200);
 
@@ -21,12 +22,12 @@ async fn should_return_200_if_malformed_input() {
 async fn should_return_401_if_banned_token() {
     let mut app = TestApp::new().await;
     let email = get_random_email();
-    let email = Email::parse(&email).unwrap();
+    let email = Email::parse(&SecretBox::new(Box::new(email))).unwrap();
     let token = generate_auth_token(&email).unwrap();
 
     assert!(app.banned_token_store.register(vec![&token]).await.is_ok());
 
-    let response = app.post_verify_token(&json!({ "token": token })).await;
+    let response = app.post_verify_token(&json!({ "token": token.expose_secret() })).await;
 
     assert_eq!(response.status().as_u16(), 401);
 

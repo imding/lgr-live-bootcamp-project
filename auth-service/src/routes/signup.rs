@@ -4,14 +4,15 @@ use {
         domain::{email::Email, error::AuthAPIError, password::Password, user::User},
     },
     axum::{Json, extract::State, http::StatusCode, response::IntoResponse},
+    secrecy::SecretBox,
     serde::{Deserialize, Serialize},
     tracing::instrument,
 };
 
 #[derive(Deserialize)]
 pub struct SignupRequest {
-    pub email: String,
-    pub password: String,
+    pub email: SecretBox<String>,
+    pub password: SecretBox<String>,
     #[serde(rename = "requires2FA")]
     pub requires_2fa: bool,
 }

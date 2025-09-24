@@ -2,6 +2,7 @@ use {
     crate::helpers::{TestApp, get_random_email},
     auth_service::{ErrorResponse, utils::constants::JWT_COOKIE_NAME},
     reqwest::Url,
+    secrecy::SecretBox,
     serde_json::json,
 };
 
@@ -30,7 +31,7 @@ async fn should_return_200_if_valid_jwt_cookie() {
 
     assert_eq!(response.status().as_u16(), 200);
 
-    let exists = app.banned_token_store.check(token.value()).await;
+    let exists = app.banned_token_store.check(&SecretBox::new(Box::new(token.value().to_string()))).await;
 
     assert!(exists.is_ok());
     assert!(exists.unwrap());

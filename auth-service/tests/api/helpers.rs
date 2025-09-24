@@ -12,6 +12,7 @@ use {
         cookie::{CookieStore, Jar},
         header::COOKIE,
     },
+    secrecy::{ExposeSecret, SecretBox},
     serde::Serialize,
     sqlx::{
         Connection as _, Executor, PgConnection, PgPool, migrate,
@@ -152,11 +153,16 @@ pub fn get_random_email() -> String {
 }
 
 pub async fn configure_postgresql() -> (PgPool, String) {
-    let url = DATABASE_URL.to_owned();
+    let url = DATABASE_URL.expose_secret().to_owned();
     let suffix = Uuid::new_v4().to_string();
     let (url, name) = configure_database(&url, &suffix).await;
 
-    (get_postgres_pool(&format!("{url}/{name}")).await.expect("Failed to create Postgres connection pool!"), name)
+    (
+        get_postgres_pool(&SecretBox::new(Box::new(format!("{url}/{name}"))))
+            .await
+            .expect("Failed to create Postgres connection pool!"),
+        name,
+    )
 }
 
 async fn configure_database(url: &str, suffix: &str) -> (String, String) {
@@ -183,7 +189,7 @@ async fn configure_database(url: &str, suffix: &str) -> (String, String) {
 }
 
 async fn delete_database(name: &str) {
-    let (url, _) = DATABASE_URL.rsplit_once('/').unwrap();
+    let (url, _) = DATABASE_URL.expose_secret().rsplit_once('/').unwrap();
     let options =
         PgConnectOptions::from_str(&format!("{url}/postgres")).expect("Failed to parse PostgreSQL connection string");
     let mut connection = PgConnection::connect_with(&options).await.expect("Failed to connect to Postgres");

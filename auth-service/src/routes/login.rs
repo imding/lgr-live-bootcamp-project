@@ -16,14 +16,15 @@ use {
         response::IntoResponse,
     },
     axum_extra::extract::CookieJar,
+    secrecy::{ExposeSecret, SecretBox},
     serde::{Deserialize, Serialize},
     tracing::instrument,
 };
 
 #[derive(Deserialize)]
 pub struct LoginRequest {
-    pub email: String,
-    pub password: String,
+    pub email: SecretBox<String>,
+    pub password: SecretBox<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -98,7 +99,11 @@ async fn handle_2fa(email: &Email, state: &AppState) -> Result<(StatusCode, Logi
         .await
         .map_err(|e| AuthAPIError::UnexpectedError(e.into()))?;
 
-    state.email_client.send_email(email, "Your 2FA", code.as_ref()).await.map_err(AuthAPIError::UnexpectedError)?;
+    state
+        .email_client
+        .send_email(email, "Your 2FA", code.as_ref().expose_secret())
+        .await
+        .map_err(AuthAPIError::UnexpectedError)?;
 
     Ok((
         StatusCode::PARTIAL_CONTENT,

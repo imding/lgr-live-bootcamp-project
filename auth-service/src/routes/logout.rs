@@ -6,6 +6,7 @@ use {
     },
     axum::{extract::State, http::StatusCode, response::IntoResponse},
     axum_extra::extract::{CookieJar, cookie::Cookie},
+    secrecy::SecretBox,
     tracing::instrument,
 };
 
@@ -21,11 +22,14 @@ pub async fn logout(state: State<AppState>, jar: CookieJar) -> Result<(CookieJar
         return Err(AuthAPIError::MissingToken);
     }
 
-    if validate_token(Some(state.banned_token_store.clone()), &token).await.is_err() {
+    if validate_token(Some(state.banned_token_store.clone()), &SecretBox::new(Box::new(token.to_owned())))
+        .await
+        .is_err()
+    {
         return Err(AuthAPIError::InvalidToken);
     }
 
-    if let Err(e) = state.banned_token_store.register(vec![&token]).await {
+    if let Err(e) = state.banned_token_store.register(vec![&SecretBox::new(Box::new(token.clone()))]).await {
         return Err(AuthAPIError::UnexpectedError(e.into()));
     }
 

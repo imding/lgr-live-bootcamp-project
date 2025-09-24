@@ -5,6 +5,7 @@ use {
         password::Password,
         user::{User, UserRow},
     },
+    secrecy::ExposeSecret,
     sqlx::{PgPool, query_as},
     tracing::instrument,
 };
@@ -41,7 +42,7 @@ impl UserStore for PostgresUserStore {
 
     #[instrument(name = "Get user from database", skip_all)]
     async fn get_user(&self, email: &Email) -> Result<UserRow, UserStoreError> {
-        let user_row = query_as!(UserRow, r#"select * from users where email = $1;"#, email.as_ref())
+        let user_row = query_as!(UserRow, r#"select * from users where email = $1;"#, email.as_ref().expose_secret())
             .fetch_one(&self.pool)
             .await
             .map_err(|e| UserStoreError::UnexpectedError(e.into()))?;

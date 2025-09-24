@@ -4,6 +4,7 @@ use {
         utils::auth::TOKEN_TTL_SECONDS,
     },
     redis::{Connection, TypedCommands},
+    secrecy::{ExposeSecret, SecretBox},
     tokio::sync::RwLock,
     tracing::instrument,
 };
@@ -23,7 +24,7 @@ impl RedisBannedTokenStore {
 #[async_trait::async_trait]
 impl BannedTokenStore for RedisBannedTokenStore {
     #[instrument(name = "Check token in redis", skip_all)]
-    async fn check(&self, token: &str) -> Result<bool, BannedTokenStoreError> {
+    async fn check(&self, token: &SecretBox<String>) -> Result<bool, BannedTokenStoreError> {
         let mut connection = self.connection.write().await;
 
         match connection.exists(get_key(token)) {
@@ -33,7 +34,7 @@ impl BannedTokenStore for RedisBannedTokenStore {
     }
 
     #[instrument(name = "Add token to redis", skip_all)]
-    async fn register(&self, tokens: Vec<&str>) -> Result<(), BannedTokenStoreError> {
+    async fn register(&self, tokens: Vec<&SecretBox<String>>) -> Result<(), BannedTokenStoreError> {
         let mut connection = self.connection.write().await;
 
         for token in tokens {
@@ -55,6 +56,6 @@ impl BannedTokenStore for RedisBannedTokenStore {
     }
 }
 
-fn get_key(token: &str) -> String {
-    format!("{BANNED_TOKEN_KEY_PREFIX}{token}")
+fn get_key(token: &SecretBox<String>) -> String {
+    format!("{BANNED_TOKEN_KEY_PREFIX}{}", token.expose_secret())
 }

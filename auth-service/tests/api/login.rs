@@ -6,6 +6,7 @@ use {
         routes::{RegularAuthResponse, TwoFactorAuthResponse},
         utils::constants::JWT_COOKIE_NAME,
     },
+    secrecy::SecretBox,
     serde_json::json,
 };
 
@@ -71,7 +72,7 @@ async fn should_return_206_if_valid_credentials_and_2fa_enabled() {
 
     assert_eq!(body.message, "2FA required".to_owned());
 
-    let email = Email::parse(&email).unwrap();
+    let email = Email::parse(&SecretBox::new(Box::new(email))).unwrap();
     let maybe_value = app.two_factor_store.get_code(&email).await;
 
     assert!(maybe_value.is_ok());

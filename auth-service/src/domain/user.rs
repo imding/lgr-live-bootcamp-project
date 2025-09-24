@@ -2,6 +2,7 @@ use {
     crate::domain::{email::Email, password::Password},
     argon2::{Argon2, PasswordHash, PasswordVerifier},
     color_eyre::Result,
+    secrecy::{ExposeSecret, SecretBox},
     tokio::task::spawn_blocking,
     tracing::{Span, instrument},
 };
@@ -31,16 +32,20 @@ impl User {
         let password = self.password.to_owned();
         let password_hash = spawn_blocking(move || current_span.in_scope(|| password.hash())).await??;
 
-        Ok(UserRow { email: self.email.as_ref().to_string(), password_hash, requires_2fa: self.requires_2fa })
+        Ok(UserRow {
+            email: self.email.as_ref().expose_secret().to_owned(),
+            password_hash,
+            requires_2fa: self.requires_2fa,
+        })
     }
 }
 
 impl UserRow {
     #[instrument(name = "Verify password hash", skip_all)]
-    pub async fn verify_password_hash(&self, target: &str) -> Result<()> {
+    pub async fn verify_password_hash(&self, target: &SecretBox<String>) -> Result<()> {
         let current_span = Span::current();
         let hash = self.password_hash.to_owned();
-        let target = target.to_owned();
+        let target = target.expose_secret().to_owned();
 
         Ok(spawn_blocking(move || {
             current_span.in_scope(|| {

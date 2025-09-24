@@ -18,6 +18,7 @@ use {
         routing::post,
     },
     redis::{Client, RedisResult},
+    secrecy::{ExposeSecret, SecretBox},
     serde::{Deserialize, Serialize},
     sqlx::{PgPool, postgres::PgPoolOptions},
     std::{error::Error, io::Error as IoError},
@@ -91,8 +92,8 @@ impl IntoResponse for AuthAPIError {
     }
 }
 
-pub async fn get_postgres_pool(url: &str) -> Result<PgPool, sqlx::Error> {
-    PgPoolOptions::new().max_connections(5).connect(url).await
+pub async fn get_postgres_pool(url: &SecretBox<String>) -> Result<PgPool, sqlx::Error> {
+    PgPoolOptions::new().max_connections(5).connect(url.expose_secret()).await
 }
 
 pub fn get_redis_client(host: &str) -> RedisResult<Client> {
