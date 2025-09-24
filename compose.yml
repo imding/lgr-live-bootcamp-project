@@ -13,6 +13,7 @@ services:
     environment:
       JWT_SECRET: ${JWT_SECRET}
       DATABASE_URL: "postgres:://rusty:${POSTGRES_PASSWORD}@db:5432"
+      RESEND_SENDER_API_KEY: ${RESEND_SENDER_API_KEY}
     image: vitalandnow/auth-service
     restart: "always" # automatically restart container when server crashes
     ports:

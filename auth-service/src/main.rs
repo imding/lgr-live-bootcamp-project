@@ -2,15 +2,20 @@ use {
     auth_service::{
         Application,
         app_state::AppState,
+        domain::email::Email,
         get_postgres_pool, get_redis_client,
-        services::{MockEmailClient, PostgresUserStore, RedisBannedTokenStore, RedisTwoFactorStore},
+        services::{PostgresUserStore, RedisBannedTokenStore, RedisTwoFactorStore, Resend},
         utils::{
-            constants::{DATABASE_URL, REDIS_HOST_NAME, prod},
+            constants::{
+                DATABASE_URL, REDIS_HOST_NAME, RESEND_SENDER_API_KEY,
+                prod::{self, email_client::SENDER},
+            },
             tracing::init_tracing,
         },
     },
     color_eyre::install,
     redis::Connection as RedisConnection,
+    secrecy::SecretBox,
     sqlx::{PgPool, migrate},
     std::sync::Arc,
 };
@@ -28,7 +33,10 @@ async fn main() {
         Arc::new(banned_token_store),
         Arc::new(user_store),
         Arc::new(two_factor_store),
-        Arc::new(MockEmailClient),
+        Arc::new(Resend::new(
+            Email::parse(&SecretBox::new(Box::new(SENDER.to_owned()))).unwrap(),
+            &RESEND_SENDER_API_KEY,
+        )),
     );
     let app = Application::build(app_state, prod::APP_ADDRESS).await.expect("Failed to build app.");
 
